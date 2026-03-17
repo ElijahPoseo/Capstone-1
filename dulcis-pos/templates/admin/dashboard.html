@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | Dulcis POS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+<body class="admin-body">
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Admin Panel</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-item active">Dashboard</a>
+                <a href="{{ url_for('admin_products') }}" class="nav-item">Products</a>
+                <a href="{{ url_for('admin_sales') }}" class="nav-item">Sales</a>
+                <a href="{{ url_for('admin_users') }}" class="nav-item">Users</a>
+                <a href="{{ url_for('admin_reports') }}" class="nav-item">Reports</a>
+                <a href="{{ url_for('admin_audit_log') }}" class="nav-item">Audit Log</a>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="{{ url_for('pos') }}" class="nav-item">Back to POS</a>
+                <a href="{{ url_for('logout') }}" class="nav-item">Logout</a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <header class="admin-header">
+                <h1>Dashboard Overview</h1>
+                <span>{{ session.username }} ({{ session.role }})</span>
+            </header>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <span class="stat-label">Total Products</span>
+                        <span class="stat-value">{{ stats.total_products }}</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <span class="stat-label">Low Stock Alerts</span>
+                        <span class="stat-value text-danger">{{ stats.low_stock }}</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <span class="stat-label">Today's Revenue</span>
+                        <span class="stat-value">₱{{ "%.2f"|format(stats.today_sales) }}</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-info">
+                        <span class="stat-label">Active Users</span>
+                        <span class="stat-value">{{ stats.total_users }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Sales -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Recent Transactions</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Transaction ID</th>
+                                <th>Cashier</th>
+                                <th>Amount</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sale in recent_sales %}
+                            <tr>
+                                <td>{{ sale.transaction_id }}</td>
+                                <td>{{ sale.cashier_name }}</td>
+                                <td>₱{{ "%.2f"|format(sale.total_amount) }}</td>
+                                <td>{{ sale.created_at }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

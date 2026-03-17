@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS - Dulcis & Café</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pos.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="pos-container">
+        <!-- Header -->
+        <header class="pos-header">
+            <div class="brand">
+                <h1>Dulcis & Café</h1>
+                <span class="role-badge">{{ session.role }}</span>
+            </div>
+            <div class="header-actions">
+                <span class="user-info">Welcome, {{ session.username }}</span>
+                <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary" id="admin-btn" style="display: {% if session.role == 'admin' %}inline-flex{% else %}none{% endif %}">
+                    Admin Panel
+                </a>
+                <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
+            </div>
+        </header>
+
+        <div class="pos-main">
+            <!-- Products Section -->
+            <div class="products-section">
+                <div class="search-bar">
+                    <input type="text" id="search-input" placeholder="Search products..." autocomplete="off">
+                    <select id="category-filter">
+                        <option value="">All Categories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="products-grid" id="products-grid">
+                    {% for product in products %}
+                    <div class="product-card" data-id="{{ product.id }}" data-stock="{{ product.stock }}">
+                        <div class="product-image">
+                            {% if product.image %}
+                            <img src="{{ url_for('static', filename='images/products/' + product.image) }}" alt="{{ product.name }}">
+                            {% else %}
+                            <div class="no-image">No Image</div>
+                            {% endif %}
+                        </div>
+                        <div class="product-info">
+                            <h3>{{ product.name }}</h3>
+                            <p class="category">{{ product.category_name or 'Uncategorized' }}</p>
+                            <p class="price">₱{{ "%.2f"|format(product.price) }}</p>
+                            <p class="stock {% if product.stock <= product.min_stock_level %}low{% endif %}">
+                                Stock: {{ product.stock }}
+                            </p>
+                        </div>
+                        <button class="btn btn-primary add-to-cart" onclick="addToCart({{ product.id }}, '{{ product.name }}', {{ product.price }}, {{ product.stock }})">
+                            Add to Cart
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Cart Section -->
+            <div class="cart-section">
+                <div class="cart-header">
+                    <h2>Current Order</h2>
+                    <button class="btn btn-ghost" onclick="clearCart()">Clear</button>
+                </div>
+                
+                <div class="cart-items" id="cart-items">
+                    <div class="empty-cart">
+                        <p>No items added yet</p>
+                    </div>
+                </div>
+                
+                <div class="cart-summary">
+                    <div class="summary-row">
+                        <span>Subtotal:</span>
+                        <span id="subtotal">₱0.00</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Tax (12%):</span>
+                        <span id="tax">₱0.00</span>
+                    </div>
+                    <div class="summary-row total">
+                        <span>Total:</span>
+                        <span id="total">₱0.00</span>
+                    </div>
+                </div>
+                
+                <div class="payment-section">
+                    <div class="payment-methods">
+                        <label class="payment-option">
+                            <input type="radio" name="payment" value="cash" checked>
+                            <span>Cash</span>
+                        </label>
+                        <label class="payment-option">
+                            <input type="radio" name="payment" value="card">
+                            <span>Card</span>
+                        </label>
+                        <label class="payment-option">
+                            <input type="radio" name="payment" value="digital">
+                            <span>Digital</span>
+                        </label>
+                    </div>
+                    
+                    <div class="cash-calculator" id="cash-calculator">
+                        <label>Amount Received:</label>
+                        <input type="number" id="amount-received" step="0.01" placeholder="0.00">
+                        <div class="change-display">
+                            <span>Change:</span>
+                            <span id="change-amount">₱0.00</span>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-success btn-large" onclick="processCheckout()" id="checkout-btn" disabled>
+                        Complete Sale
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receipt Modal -->
+    <div class="modal" id="receipt-modal">
+        <div class="modal-content receipt">
+            <div class="receipt-header">
+                <h2>Dulcis & Café</h2>
+                <p id="receipt-datetime"></p>
+                <p id="receipt-transaction"></p>
+            </div>
+            <div class="receipt-items" id="receipt-items"></div>
+            <div class="receipt-summary">
+                <div class="receipt-row">
+                    <span>Subtotal:</span>
+                    <span id="receipt-subtotal"></span>
+                </div>
+                <div class="receipt-row">
+                    <span>Tax:</span>
+                    <span id="receipt-tax"></span>
+                </div>
+                <div class="receipt-row total">
+                    <span>Total:</span>
+                    <span id="receipt-total"></span>
+                </div>
+            </div>
+            <div class="receipt-footer">
+                <p>Thank you for your purchase!</p>
+                <button class="btn btn-primary" onclick="closeReceipt()">New Sale</button>
+                <button class="btn btn-secondary" onclick="printReceipt()">Print</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let cart = [];
+        const TAX_RATE = 0.12;
+
+        // Search functionality
+        document.getElementById('search-input').addEventListener('input', debounce(searchProducts, 300));
+        document.getElementById('category-filter').addEventListener('change', searchProducts);
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        async function searchProducts() {
+            const query = document.getElementById('search-input').value;
+            const category = document.getElementById('category-filter').value;
+            
+            try {
+                const response = await fetch(`/api/products/search?q=${encodeURIComponent(query)}&category=${encodeURIComponent(category)}`);
+                const products = await response.json();
+                renderProducts(products);
+            } catch (error) {
+                console.error('Search failed:', error);
+            }
+        }
+
+        function renderProducts(products) {
+            const grid = document.getElementById('products-grid');
+            if (products.length === 0) {
+                grid.innerHTML = '<div class="no-results">No products found</div>';
+                return;
+            }
+            
+            grid.innerHTML = products.map(p => `
+                <div class="product-card" data-id="${p.id}" data-stock="${p.stock}">
+                    <div class="product-image">
+                        ${p.image ? `<img src="/static/images/products/${p.image}" alt="${p.name}">` : '<div class="no-image">No Image</div>'}
+                    </div>
+                    <div class="product-info">
+                        <h3>${p.name}</h3>
+                        <p class="category">${p.category || 'Uncategorized'}</p>
+                        <p class="price">₱${parseFloat(p.price).toFixed(2)}</p>
+                        <p class="stock ${p.stock <= 10 ? 'low' : ''}">Stock: ${p.stock}</p>
+                    </div>
+                    <button class="btn btn-primary add-to-cart" onclick="addToCart(${p.id}, '${p.name}', ${p.price}, ${p.stock})">
+                        Add to Cart
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function addToCart(id, name, price, stock) {
+            const existingItem = cart.find(item => item.id === id);
+            
+            if (existingItem) {
+                if (existingItem.quantity >= stock) {
+                    alert('Not enough stock available!');
+                    return;
+                }
+                existingItem.quantity++;
+            } else {
+                cart.push({ id, name, price, quantity: 1 });
+            }
+            
+            renderCart();
+        }
+
+        function removeFromCart(id) {
+            cart = cart.filter(item => item.id !== id);
+            renderCart();
+        }
+
+        function updateQuantity(id, delta) {
+            const item = cart.find(item => item.id === id);
+            if (!item) return;
+            
+            const newQty = item.quantity + delta;
+            if (newQty <= 0) {
+                removeFromCart(id);
+                return;
+            }
+            
+            // Check stock
+            const productCard = document.querySelector(`[data-id="${id}"]`);
+            const stock = parseInt(productCard?.dataset.stock || 0);
+            
+            if (newQty > stock) {
+                alert('Not enough stock available!');
+                return;
+            }
+            
+            item.quantity = newQty;
+            renderCart();
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cart-items');
+            
+            if (cart.length === 0) {
+                container.innerHTML = '<div class="empty-cart"><p>No items added yet</p></div>';
+                updateTotals();
+                return;
+            }
+            
+            container.innerHTML = cart.map(item => `
+                <div class="cart-item">
+                    <div class="item-info">
+                        <h4>${item.name}</h4>
+                        <p>₱${item.price.toFixed(2)} each</p>
+                    </div>
+                    <div class="item-controls">
+                        <button onclick="updateQuantity(${item.id}, -1)">-</button>
+                        <span>${item.quantity}</span>
+                        <button onclick="updateQuantity(${item.id}, 1)">+</button>
+                    </div>
+                    <div class="item-total">
+                        <p>₱${(item.price * item.quantity).toFixed(2)}</p>
+                        <button class="btn-remove" onclick="removeFromCart(${item.id})">×</button>
+                    </div>
+                </div>
+            `).join('');
+            
+            updateTotals();
+        }
+
+        function updateTotals() {
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const tax = subtotal * TAX_RATE;
+            const total = subtotal + tax;
+            
+            document.getElementById('subtotal').textContent = `₱${subtotal.toFixed(2)}`;
+            document.getElementById('tax').textContent = `₱${tax.toFixed(2)}`;
+            document.getElementById('total').textContent = `₱${total.toFixed(2)}`;
+            
+            document.getElementById('checkout-btn').disabled = cart.length === 0;
+            
+            // Update change calculation
+            calculateChange();
+        }
+
+        function clearCart() {
+            if (cart.length === 0) return;
+            if (!confirm('Clear all items from cart?')) return;
+            cart = [];
+            renderCart();
+        }
+
+        // Payment method toggle
+        document.querySelectorAll('input[name="payment"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const cashCalc = document.getElementById('cash-calculator');
+                cashCalc.style.display = e.target.value === 'cash' ? 'block' : 'none';
+            });
+        });
+
+        document.getElementById('amount-received').addEventListener('input', calculateChange);
+
+        function calculateChange() {
+            const total = parseFloat(document.getElementById('total').textContent.replace('₱', ''));
+            const received = parseFloat(document.getElementById('amount-received').value) || 0;
+            const change = received - total;
+            document.getElementById('change-amount').textContent = `₱${change >= 0 ? change.toFixed(2) : '0.00'}`;
+        }
+
+        async function processCheckout() {
+            if (cart.length === 0) return;
+            
+            const paymentMethod = document.querySelector('input[name="payment"]:checked').value;
+            const total = parseFloat(document.getElementById('total').textContent.replace('₱', ''));
+            
+            if (paymentMethod === 'cash') {
+                const received = parseFloat(document.getElementById('amount-received').value) || 0;
+                if (received < total) {
+                    alert('Insufficient amount received!');
+                    return;
+                }
+            }
+            
+            try {
+                const response = await fetch('/api/sale/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: cart.map(item => ({
+                            product_id: item.id,
+                            quantity: item.quantity
+                        })),
+                        payment_method: paymentMethod
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showReceipt(result);
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to create sale'));
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+            }
+        }
+
+        function showReceipt(saleData) {
+            const modal = document.getElementById('receipt-modal');
+            const now = new Date();
+            
+            document.getElementById('receipt-datetime').textContent = now.toLocaleString();
+            document.getElementById('receipt-transaction').textContent = `Transaction: ${saleData.transaction_id}`;
+            
+            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const tax = subtotal * TAX_RATE;
+            
+            document.getElementById('receipt-items').innerHTML = cart.map(item => `
+                <div class="receipt-item">
+                    <span>${item.name} x${item.quantity}</span>
+                    <span>₱${(item.price * item.quantity).toFixed(2)}</span>
+                </div>
+            `).join('');
+            
+            document.getElementById('receipt-subtotal').textContent = `₱${subtotal.toFixed(2)}`;
+            document.getElementById('receipt-tax').textContent = `₱${tax.toFixed(2)}`;
+            document.getElementById('receipt-total').textContent = `₱${saleData.total.toFixed(2)}`;
+            
+            modal.style.display = 'flex';
+        }
+
+        function closeReceipt() {
+            document.getElementById('receipt-modal').style.display = 'none';
+            cart = [];
+            renderCart();
+            document.getElementById('amount-received').value = '';
+            searchProducts(); // Refresh to update stock
+        }
+
+        function printReceipt() {
+            window.print();
+        }
+
+        // Close modal on outside click
+        window.onclick = function(event) {
+            const modal = document.getElementById('receipt-modal');
+            if (event.target === modal) {
+                closeReceipt();
+            }
+        }
+    </script>
+</body>
+</html>
+'''
+
+with open('/mnt/kimi/output/pos_template.html', 'w') as f:
+    f.write(pos_template)
+
+print("✅ Updated POS template created: pos_template.html")
