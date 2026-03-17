@@ -1,20 +1,209 @@
-# Create additional admin templates
-# 1. Admin Products Management Template
-admin_products_template = '''<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Products | Admin Panel</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+        .admin-container { display: flex; min-height: 100vh; }
+        .sidebar {
+            width: 260px;
+            background: #1a1a2e;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+        }
+        .sidebar-header { padding: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .sidebar-header h2 { font-size: 1.25rem; font-weight: 600; }
+        .sidebar-nav { flex: 1; padding: 1rem 0; }
+        .nav-item {
+            display: block;
+            padding: 0.75rem 1.5rem;
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+        .nav-item:hover { color: white; background: rgba(255,255,255,0.05); }
+        .nav-item.active { color: #667eea; background: rgba(102, 126, 234, 0.1); border-left-color: #667eea; }
+        .sidebar-footer { padding: 1rem 0; border-top: 1px solid rgba(255,255,255,0.1); }
+        .admin-main { flex: 1; margin-left: 260px; padding: 2rem; }
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        .admin-header h1 { font-size: 1.75rem; color: #1a1a2e; }
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5568d3; }
+        .btn-secondary { background: #e0e0e0; color: #333; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-sm { padding: 0.25rem 0.75rem; font-size: 0.8rem; }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .table-responsive { overflow-x: auto; }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .table th, .table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .table th {
+            font-weight: 600;
+            color: #666;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+        }
+        .table tbody tr:hover { background: #f8f9fa; }
+        .thumbnail {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+        .no-thumbnail {
+            width: 50px;
+            height: 50px;
+            background: #e0e0e0;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            color: #666;
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-success { background: #d1fae5; color: #065f46; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+        .flash-messages { margin-bottom: 1.5rem; }
+        .alert {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+        }
+        .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+        .alert-danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        .alert-warning { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+        }
+        .modal form { padding: 1.5rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #333;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .form-group small {
+            display: block;
+            margin-top: 0.25rem;
+            color: #666;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e0e0e0;
+        }
+        .text-danger { color: #ef4444; }
+        .text-muted { color: #666; }
+    </style>
 </head>
-<body class="admin-body">
+<body>
     <div class="admin-container">
-        <!-- Sidebar -->
         <aside class="sidebar">
-            <div class="sidebar-header">
-                <h2>Admin Panel</h2>
-            </div>
+            <div class="sidebar-header"><h2>Admin Panel</h2></div>
             <nav class="sidebar-nav">
                 <a href="{{ url_for('admin_dashboard') }}" class="nav-item">Dashboard</a>
                 <a href="{{ url_for('admin_products') }}" class="nav-item active">Products</a>
@@ -29,7 +218,6 @@ admin_products_template = '''<!DOCTYPE html>
             </div>
         </aside>
 
-        <!-- Main Content -->
         <main class="admin-main">
             <header class="admin-header">
                 <h1>Product Management</h1>
@@ -61,50 +249,48 @@ admin_products_template = '''<!DOCTYPE html>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for product in products %}
-                            <tr>
-                                <td>
-                                    {% if product.image %}
-                                    <img src="{{ url_for('static', filename='images/products/' + product.image) }}" alt="" class="thumbnail">
-                                    {% else %}
-                                    <div class="no-thumbnail">No Image</div>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <strong>{{ product.name }}</strong>
-                                    {% if product.barcode %}
-                                    <br><small class="text-muted">{{ product.barcode }}</small>
-                                    {% endif %}
-                                </td>
-                                <td>{{ product.category_name or 'Uncategorized' }}</td>
-                                <td>₱{{ "%.2f"|format(product.price) }}</td>
-                                <td>
-                                    <span class="{% if product.stock <= product.min_stock_level %}text-danger{% endif %}">
-                                        {{ product.stock }}
-                                    </span>
-                                    <small class="text-muted">/ min: {{ product.min_stock_level }}</small>
-                                </td>
-                                <td>
-                                    <span class="badge {% if product.is_active %}badge-success{% else %}badge-danger{% endif %}">
-                                        {{ 'Active' if product.is_active else 'Inactive' }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <button class="btn btn-sm btn-secondary" onclick="editProduct({{ product.id }})">Edit</button>
-                                    <form action="{{ url_for('delete_product', product_id=product.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this product?')">
-                                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
-                                    </form>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
+                        {% for product in products %}
+                        <tr>
+                            <td>
+                                {% if product.image %}
+                                <img src="{{ url_for('static', filename='images/products/' + product.image) }}" alt="" class="thumbnail">
+                                {% else %}
+                                <div class="no-thumbnail">No Image</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <strong>{{ product.name }}</strong>
+                                {% if product.barcode %}<br><small class="text-muted">{{ product.barcode }}</small>{% endif %}
+                            </td>
+                            <td>{{ product.category_name or 'Uncategorized' }}</td>
+                            <td>₱{{ "%.2f"|format(product.price) }}</td>
+                            <td>
+                                <span class="{% if product.stock <= product.min_stock_level %}text-danger{% endif %}">
+                                    {{ product.stock }}
+                                </span>
+                                <small class="text-muted">/ min: {{ product.min_stock_level }}</small>
+                            </td>
+                            <td>
+                                <span class="badge {% if product.is_active %}badge-success{% else %}badge-danger{% endif %}">
+                                    {{ 'Active' if product.is_active else 'Inactive' }}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-secondary" onclick="editProduct({{ product.id }})">Edit</button>
+                                
+                                <form action="{{ url_for('delete_product', product_id=product.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this product?')">
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
                     </table>
                 </div>
             </div>
         </main>
     </div>
 
-    <!-- Add Product Modal -->
     <div class="modal" id="add-modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -161,7 +347,6 @@ admin_products_template = '''<!DOCTYPE html>
         </div>
     </div>
 
-    <!-- Edit Product Modal -->
     <div class="modal" id="edit-modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -230,11 +415,9 @@ admin_products_template = '''<!DOCTYPE html>
         function openAddModal() {
             document.getElementById('add-modal').style.display = 'flex';
         }
-
         function closeModal(modalId) {
             document.getElementById(modalId).style.display = 'none';
         }
-
         async function editProduct(id) {
             try {
                 const response = await fetch(`/api/product/${id}`);
@@ -256,7 +439,6 @@ admin_products_template = '''<!DOCTYPE html>
                 alert('Failed to load product data');
             }
         }
-
         window.onclick = function(event) {
             if (event.target.classList.contains('modal')) {
                 event.target.style.display = 'none';
@@ -265,9 +447,3 @@ admin_products_template = '''<!DOCTYPE html>
     </script>
 </body>
 </html>
-'''
-
-with open('/mnt/kimi/output/admin_products.html', 'w') as f:
-    f.write(admin_products_template)
-
-print("✅ Admin Products template created")

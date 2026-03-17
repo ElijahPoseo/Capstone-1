@@ -1,5 +1,4 @@
-# Create Audit Log Template
-admin_audit_template = '''<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -95,9 +94,3 @@ admin_audit_template = '''<!DOCTYPE html>
     </div>
 </body>
 </html>
-'''
-
-with open('/mnt/kimi/output/admin_audit_log.html', 'w') as f:
-    f.write(admin_audit_template)
-
-print("✅ Admin Audit Log template created")

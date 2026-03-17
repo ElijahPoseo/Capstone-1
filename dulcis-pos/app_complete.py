@@ -1,4 +1,3 @@
-
 from flask import Flask, render_template, request, redirect, session, url_for, flash, jsonify, g
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -8,20 +7,22 @@ import sqlite3
 import os
 import secrets
 import re
+import json
 from contextlib import contextmanager
 
 app = Flask(__name__)
 
-# Security Configuration
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
-app.config['SESSION_COOKIE_SECURE'] = True
+# Security Configuration - OFFLINE ONLY
+app.config['SECRET_KEY'] = secrets.token_hex(32)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file upload
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "database.db")
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "static", "images", "products")
+# Paths - All local
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "database.db")
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "images", "products")
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -29,7 +30,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # Database Context Manager
 @contextmanager
 def get_db():
-    """Context manager for database connections"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -41,7 +41,7 @@ def get_db():
 def init_db():
     """Initialize database with enhanced schema"""
     with get_db() as conn:
-        # Users table with enhanced security fields
+        # Users table
         conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,7 +67,7 @@ def init_db():
             )
         """)
         
-        # Products table with enhanced fields
+        # Products table
         conn.execute("""
             CREATE TABLE IF NOT EXISTS products (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,7 +86,7 @@ def init_db():
             )
         """)
         
-        # Sales/Transactions table
+        # Sales table
         conn.execute("""
             CREATE TABLE IF NOT EXISTS sales (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -102,7 +102,7 @@ def init_db():
             )
         """)
         
-        # Sale items (line items)
+        # Sale items
         conn.execute("""
             CREATE TABLE IF NOT EXISTS sale_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -116,7 +116,7 @@ def init_db():
             )
         """)
         
-        # Audit log for security tracking
+        # Audit log
         conn.execute("""
             CREATE TABLE IF NOT EXISTS audit_log (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -127,13 +127,12 @@ def init_db():
                 old_values TEXT,
                 new_values TEXT,
                 ip_address TEXT,
-                user_agent TEXT,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """)
         
-        # Insert default admin if not exists
+        # Insert default admin
         admin_exists = conn.execute("SELECT 1 FROM users WHERE username = 'admin'").fetchone()
         if not admin_exists:
             admin_hash = generate_password_hash('Admin@123!', method='pbkdf2:sha256', salt_length=16)
@@ -142,7 +141,7 @@ def init_db():
                 VALUES (?, ?, ?, ?, ?)
             """, ('admin', admin_hash, 'admin', 'admin@dulcis.local', 1))
             
-            # Insert default categories
+            # Default categories
             categories = [
                 ('Beverages', 'Hot and cold drinks'),
                 ('Pastries', 'Cakes, muffins, and baked goods'),
@@ -153,6 +152,45 @@ def init_db():
             
         conn.commit()
 
+# Audit logging
+def log_audit(action, table_name=None, record_id=None, old_values=None, new_values=None):
+    with get_db() as conn:
+        conn.execute("""
+            INSERT INTO audit_log (user_id, action, table_name, record_id, old_values, new_values, ip_address)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            session.get('user_id'),
+            action,
+            table_name,
+            record_id,
+            str(old_values) if old_values else None,
+            str(new_values) if new_values else None,
+            request.remote_addr
+        ))
+        conn.commit()
+
+# Validation
+def validate_username(username):
+    if not username or len(username) < 3 or len(username) > 20:
+        return False
+    return re.match(r'^[a-zA-Z0-9_]+$', username) is not None
+
+def validate_password(password):
+    if len(password) < 8:
+        return False
+    if not re.search(r"[A-Z]", password):
+        return False
+    if not re.search(r"[a-z]", password):
+        return False
+    if not re.search(r"\d", password):
+        return False
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return False
+    return True
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 # Security Decorators
 def login_required(f):
     @wraps(f)
@@ -161,7 +199,6 @@ def login_required(f):
             flash('Please log in to access this page.', 'warning')
             return redirect(url_for('login'))
         
-        # Check session validity
         if 'last_activity' in session:
             last_activity = datetime.fromisoformat(session['last_activity'])
             if datetime.now() - last_activity > timedelta(hours=1):
@@ -177,8 +214,8 @@ def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session or session.get('role') != 'admin':
-            flash('Admin access required.', 'danger')
-            return redirect(url_for('dashboard'))
+            flash('Admin access required. Please login as administrator.', 'danger')
+            return redirect(url_for('admin_login'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -188,53 +225,29 @@ def role_required(*roles):
         def decorated_function(*args, **kwargs):
             if 'user_id' not in session or session.get('role') not in roles:
                 flash('Insufficient permissions.', 'danger')
-                return redirect(url_for('dashboard'))
+                return redirect(url_for('pos'))
             return f(*args, **kwargs)
         return decorated_function
     return decorator
 
-# Audit logging
-def log_audit(action, table_name=None, record_id=None, old_values=None, new_values=None):
-    """Log actions for security auditing"""
-    with get_db() as conn:
-        conn.execute("""
-            INSERT INTO audit_log (user_id, action, table_name, record_id, old_values, new_values, ip_address, user_agent)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            session.get('user_id'),
-            action,
-            table_name,
-            record_id,
-            str(old_values) if old_values else None,
-            str(new_values) if new_values else None,
-            request.remote_addr,
-            request.user_agent.string[:200] if request.user_agent else None
-        ))
-        conn.commit()
-
-# Input validation
-def validate_username(username):
-    """Validate username format"""
-    if not username or len(username) < 3 or len(username) > 20:
-        return False
-    return re.match(r'^[a-zA-Z0-9_]+$', username) is not None
-
-def validate_password(password):
-    """Validate password strength"""
-    if len(password) < 8:
-        return False
-    if not re.search(r"[A-Z]", password):
-        return False
-    if not re.search(r"[a-z]", password):
-        return False
-    if not re.search(r"\\d", password):
-        return False
-    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
-        return False
-    return True
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+# MIDDLEWARE: Block non-admin users from admin routes
+@app.before_request
+def check_admin_access():
+    """Block non-admin users from accessing admin routes"""
+    if request.path.startswith('/admin'):
+        # Allow access to admin login page
+        if request.path == '/admin/login':
+            return None
+        
+        # Check if user is logged in
+        if 'user_id' not in session:
+            flash('Please login first.', 'warning')
+            return redirect(url_for('login'))
+        
+        # Check if user is admin
+        if session.get('role') != 'admin':
+            flash('Admin access required. Insufficient privileges.', 'danger')
+            return redirect(url_for('pos'))
 
 # Routes
 @app.route("/")
@@ -243,6 +256,9 @@ def index():
         return redirect(url_for('pos'))
     return redirect(url_for('login'))
 
+# ============================================
+# STAFF LOGIN (Cashier/Manager)
+# ============================================
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if 'user_id' in session:
@@ -263,20 +279,17 @@ def login():
             ).fetchone()
             
             if user:
-                # Check if account is locked
                 if user['locked_until'] and datetime.now() < datetime.fromisoformat(user['locked_until']):
                     flash("Account temporarily locked. Please try again later.", "danger")
                     return render_template("login.html")
                 
                 if check_password_hash(user['password_hash'], password):
-                    # Successful login
                     session.permanent = True
                     session['user_id'] = user['id']
                     session['username'] = user['username']
                     session['role'] = user['role']
                     session['last_activity'] = datetime.now().isoformat()
                     
-                    # Reset failed attempts
                     conn.execute(
                         "UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login = ? WHERE id = ?",
                         (datetime.now().isoformat(), user['id'])
@@ -285,10 +298,13 @@ def login():
                     
                     log_audit("LOGIN_SUCCESS", "users", user['id'])
                     
+                    # If admin, redirect to admin dashboard
+                    if user['role'] == 'admin':
+                        return redirect(url_for('admin_dashboard'))
+                    
                     flash(f"Welcome back, {user['username']}!")
                     return redirect(url_for('pos'))
                 else:
-                    # Failed login
                     attempts = user['failed_login_attempts'] + 1
                     lock_until = None
                     
@@ -319,6 +335,55 @@ def logout():
     flash("You have been logged out successfully.", "info")
     return redirect(url_for('login'))
 
+# ============================================
+# ADMIN LOGIN (Separate for extra security)
+# ============================================
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    """Dedicated admin login page"""
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        
+        with get_db() as conn:
+            # Only allow users with admin role
+            user = conn.execute(
+                "SELECT * FROM users WHERE username = ? AND role = 'admin' AND is_active = 1", 
+                (username,)
+            ).fetchone()
+            
+            if user and check_password_hash(user['password_hash'], password):
+                session.permanent = True
+                session['user_id'] = user['id']
+                session['username'] = user['username']
+                session['role'] = 'admin'
+                session['last_activity'] = datetime.now().isoformat()
+                
+                conn.execute(
+                    "UPDATE users SET last_login = ? WHERE id = ?",
+                    (datetime.now().isoformat(), user['id'])
+                )
+                conn.commit()
+                
+                log_audit("ADMIN_LOGIN_SUCCESS", "users", user['id'])
+                flash(f"Welcome Administrator, {user['username']}!")
+                return redirect(url_for('admin_dashboard'))
+            else:
+                flash("Invalid admin credentials or insufficient privileges.", "danger")
+                log_audit("ADMIN_LOGIN_FAILED", None, None, {'username': username})
+    
+    return render_template("admin/login.html")
+
+@app.route("/admin/logout")
+def admin_logout():
+    """Admin logout - clears session completely"""
+    session.clear()
+    flash("Admin logged out successfully.", "info")
+    return redirect(url_for('admin_login'))
+
+# ============================================
+# POS ROUTES (Cashier/Manager/Admin)
+# ============================================
 @app.route("/pos")
 @login_required
 def pos():
@@ -388,7 +453,6 @@ def create_sale():
     
     try:
         with get_db() as conn:
-            # Verify stock availability and calculate totals
             total_amount = 0
             sale_items_data = []
             
@@ -414,10 +478,8 @@ def create_sale():
                     'total_price': item_total
                 })
             
-            # Generate transaction ID
             transaction_id = f"TXN-{datetime.now().strftime('%Y%m%d%H%M%S')}-{secrets.token_hex(4).upper()}"
             
-            # Create sale record
             cursor = conn.execute("""
                 INSERT INTO sales (transaction_id, user_id, total_amount, payment_method, payment_status)
                 VALUES (?, ?, ?, ?, ?)
@@ -425,7 +487,6 @@ def create_sale():
             
             sale_id = cursor.lastrowid
             
-            # Create sale items and update inventory
             for item_data in sale_items_data:
                 conn.execute("""
                     INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, total_price)
@@ -433,7 +494,6 @@ def create_sale():
                 """, (sale_id, item_data['product_id'], item_data['quantity'], 
                       item_data['unit_price'], item_data['total_price']))
                 
-                # Update stock
                 conn.execute("""
                     UPDATE products SET stock = stock - ?, updated_at = ?
                     WHERE id = ?
@@ -457,13 +517,14 @@ def create_sale():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Admin Routes
+# ============================================
+# ADMIN ROUTES (Admin Only)
+# ============================================
 @app.route("/admin")
 @login_required
 @admin_required
 def admin_dashboard():
     with get_db() as conn:
-        # Statistics
         stats = {
             'total_products': conn.execute("SELECT COUNT(*) FROM products WHERE is_active = 1").fetchone()[0],
             'low_stock': conn.execute("SELECT COUNT(*) FROM products WHERE stock <= min_stock_level").fetchone()[0],
@@ -474,7 +535,6 @@ def admin_dashboard():
             'total_users': conn.execute("SELECT COUNT(*) FROM users WHERE is_active = 1").fetchone()[0]
         }
         
-        # Recent sales
         recent_sales = conn.execute("""
             SELECT s.*, u.username as cashier_name
             FROM sales s
@@ -482,7 +542,6 @@ def admin_dashboard():
             ORDER BY s.created_at DESC LIMIT 10
         """).fetchall()
         
-        # Low stock alerts
         low_stock_items = conn.execute("""
             SELECT * FROM products 
             WHERE stock <= min_stock_level AND is_active = 1
@@ -520,7 +579,6 @@ def add_product():
     min_stock = request.form.get('min_stock_level', 10)
     barcode = request.form.get('barcode', '').strip() or None
     
-    # Validation
     if not name or len(name) < 2:
         flash("Product name must be at least 2 characters.", "danger")
         return redirect(url_for('admin_products'))
@@ -541,13 +599,11 @@ def add_product():
         flash("Invalid stock quantity.", "danger")
         return redirect(url_for('admin_products'))
     
-    # Handle image upload
     image_filename = None
     if 'image' in request.files:
         file = request.files['image']
         if file and file.filename and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            # Add timestamp to filename to avoid conflicts
             name, ext = os.path.splitext(filename)
             image_filename = f"{name}_{datetime.now().strftime('%Y%m%d%H%M%S')}{ext}"
             file.save(os.path.join(UPLOAD_FOLDER, image_filename))
@@ -578,7 +634,6 @@ def add_product():
 @admin_required
 def edit_product(product_id):
     with get_db() as conn:
-        # Get existing product for audit log
         old_product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
         if not old_product:
             flash("Product not found.", "danger")
@@ -593,12 +648,10 @@ def edit_product(product_id):
         barcode = request.form.get('barcode', '').strip() or None
         is_active = 1 if request.form.get('is_active') else 0
         
-        # Handle image
         image_filename = old_product['image']
         if 'image' in request.files:
             file = request.files['image']
             if file and file.filename and allowed_file(file.filename):
-                # Delete old image
                 if image_filename and os.path.exists(os.path.join(UPLOAD_FOLDER, image_filename)):
                     os.remove(os.path.join(UPLOAD_FOLDER, image_filename))
                 
@@ -630,12 +683,10 @@ def edit_product(product_id):
 @admin_required
 def delete_product(product_id):
     with get_db() as conn:
-        # Soft delete - just mark as inactive
         conn.execute("UPDATE products SET is_active = 0 WHERE id = ?", (product_id,))
         conn.commit()
         
         log_audit("PRODUCT_DELETED", "products", product_id)
-        
         flash("Product deleted successfully!", "success")
     
     return redirect(url_for('admin_products'))
@@ -660,7 +711,6 @@ def add_user():
     role = request.form.get('role', 'cashier')
     email = request.form.get('email', '').strip()
     
-    # Validation
     if not validate_username(username):
         flash("Username must be 3-20 characters, alphanumeric only.", "danger")
         return redirect(url_for('admin_users'))
@@ -745,8 +795,7 @@ def admin_sales():
 @role_required('admin', 'manager')
 def admin_reports():
     with get_db() as conn:
-        # Sales by day (last 30 days)
-        daily_sales = conn.execute("""
+        daily_sales_raw = conn.execute("""
             SELECT date(created_at) as date, COUNT(*) as transactions, SUM(total_amount) as revenue
             FROM sales
             WHERE created_at >= date('now', '-30 days')
@@ -754,8 +803,16 @@ def admin_reports():
             ORDER BY date DESC
         """).fetchall()
         
-        # Top selling products
-        top_products = conn.execute("""
+        daily_sales = [
+            {
+                'date': row['date'],
+                'transactions': row['transactions'],
+                'revenue': float(row['revenue']) if row['revenue'] else 0
+            }
+            for row in daily_sales_raw
+        ]
+        
+        top_products_raw = conn.execute("""
             SELECT p.name, SUM(si.quantity) as total_sold, SUM(si.total_price) as revenue
             FROM sale_items si
             JOIN products p ON si.product_id = p.id
@@ -766,8 +823,16 @@ def admin_reports():
             LIMIT 10
         """).fetchall()
         
-        # Sales by category
-        category_sales = conn.execute("""
+        top_products = [
+            {
+                'name': row['name'],
+                'total_sold': row['total_sold'],
+                'revenue': float(row['revenue']) if row['revenue'] else 0
+            }
+            for row in top_products_raw
+        ]
+        
+        category_sales_raw = conn.execute("""
             SELECT c.name, COUNT(DISTINCT s.id) as transactions, SUM(si.total_price) as revenue
             FROM sale_items si
             JOIN products p ON si.product_id = p.id
@@ -777,6 +842,15 @@ def admin_reports():
             GROUP BY c.id
             ORDER BY revenue DESC
         """).fetchall()
+        
+        category_sales = [
+            {
+                'name': row['name'],
+                'transactions': row['transactions'],
+                'revenue': float(row['revenue']) if row['revenue'] else 0
+            }
+            for row in category_sales_raw
+        ]
         
     return render_template("admin/reports.html", daily_sales=daily_sales, 
                           top_products=top_products, category_sales=category_sales)
@@ -803,7 +877,6 @@ def admin_audit_log():
     return render_template("admin/audit_log.html", logs=logs, page=page, 
                           per_page=per_page, total=total)
 
-# API Routes for AJAX
 @app.route("/api/product/<int:product_id>")
 @login_required
 def get_product(product_id):
@@ -856,7 +929,6 @@ def dashboard_stats():
         
     return jsonify(stats)
 
-# Error handlers
 @app.errorhandler(404)
 def not_found_error(error):
     return render_template('errors/404.html'), 404
@@ -865,9 +937,13 @@ def not_found_error(error):
 def internal_error(error):
     return render_template('errors/500.html'), 500
 
-# Initialize database on startup
 if __name__ == "__main__":
     init_db()
+    print("🚀 Starting Dulcis POS...")
+    print("📍 Local: http://127.0.0.1:5000")
+    print("🌐 Network: http://0.0.0.0:5000")
+    print("🔒 Admin Login: http://127.0.0.1:5000/admin/login")
+    print("✅ 100% OFFLINE - No internet required")
     app.run(debug=True, host='0.0.0.0', port=5000)
 else:
     init_db()

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Dulcis POS</title>
+    <title>Admin Login - Dulcis POS</title>
     <style>
         * {
             margin: 0;
@@ -13,7 +13,7 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -24,7 +24,7 @@
             background: white;
             padding: 2.5rem;
             border-radius: 16px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
             width: 90%;
             max-width: 400px;
         }
@@ -40,19 +40,14 @@
             margin-bottom: 0.5rem;
         }
         
-        .brand p {
-            color: #666;
-            font-size: 0.9rem;
-        }
-        
-        .offline-badge {
-            display: inline-block;
-            background: #10b981;
+        .admin-badge {
+            background: #ef4444;
             color: white;
             padding: 0.25rem 0.75rem;
             border-radius: 12px;
             font-size: 0.75rem;
-            margin-top: 0.5rem;
+            display: inline-block;
+            font-weight: 600;
         }
         
         .form-group {
@@ -62,8 +57,8 @@
         .form-group label {
             display: block;
             margin-bottom: 0.5rem;
-            color: #333;
             font-weight: 500;
+            color: #333;
             font-size: 0.9rem;
         }
         
@@ -100,7 +95,7 @@
         
         .alert {
             padding: 1rem;
-            border-radius: 8px;
+            border-radius: 6px;
             margin-bottom: 1rem;
             font-size: 0.9rem;
         }
@@ -111,33 +106,41 @@
             border: 1px solid #fecaca;
         }
         
-        .alert-warning {
-            background: #fef3c7;
-            color: #92400e;
-            border: 1px solid #fde68a;
-        }
-        
         .alert-success {
             background: #d1fae5;
             color: #065f46;
             border: 1px solid #a7f3d0;
         }
         
-        .hint {
+        .back-link {
             text-align: center;
             margin-top: 1.5rem;
             padding-top: 1.5rem;
             border-top: 1px solid #e0e0e0;
-            font-size: 0.85rem;
+        }
+        
+        .back-link a {
+            color: #666;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        
+        .back-link a:hover {
+            color: #667eea;
+        }
+        
+        .hint {
+            text-align: center;
+            margin-top: 1rem;
+            font-size: 0.8rem;
             color: #666;
         }
         
         .hint code {
             background: #f0f0f0;
-            padding: 0.25rem 0.5rem;
+            padding: 0.2rem 0.4rem;
             border-radius: 4px;
-            font-family: "Courier New", monospace;
-            font-size: 0.8rem;
+            font-family: monospace;
         }
     </style>
 </head>
@@ -145,8 +148,7 @@
     <div class="login-container">
         <div class="brand">
             <h1>Dulcis & Café</h1>
-            <p>Point of Sale System</p>
-            <span class="offline-badge">🔒 OFFLINE MODE</span>
+            <span class="admin-badge">🔒 ADMIN ACCESS ONLY</span>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -157,21 +159,24 @@
             {% endif %}
         {% endwith %}
 
-        <form method="POST" action="{{ url_for('login') }}">
+        <form method="POST" action="{{ url_for('admin_login') }}">
             <div class="form-group">
-                <label for="username">Username</label>
+                <label for="username">Admin Username</label>
                 <input type="text" id="username" name="username" required autofocus>
             </div>
             <div class="form-group">
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" required>
             </div>
-            <button type="submit" class="btn-login">Sign In</button>
+            <button type="submit" class="btn-login">Login as Admin</button>
         </form>
 
+        <div class="back-link">
+            <a href="{{ url_for('login') }}">← Back to Staff Login</a>
+        </div>
+
         <div class="hint">
-            <p>Default admin credentials:</p>
-            <p>Username: <code>admin</code> | Password: <code>Admin@123!</code></p>
+            <p>Default: <code>admin</code> / <code>Admin@123!</code></p>
         </div>
     </div>
 </body>
