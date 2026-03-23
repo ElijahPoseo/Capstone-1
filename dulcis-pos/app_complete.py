@@ -8,7 +8,13 @@ import os
 import secrets
 import re
 import json
+import html
+import shutil
+import threading
+import time
+import winsound
 from contextlib import contextmanager
+
 
 app = Flask(__name__)
 
@@ -26,6 +32,12 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "images", "products")
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Automatic Backup Configuration
+BACKUP_DIR = os.path.join(BASE_DIR, "backups")
+MAX_LOCAL_BACKUPS = 7
+BACKUP_INTERVAL_MINUTES = 30
+os.makedirs(BACKUP_DIR, exist_ok=True)
 
 # Database Context Manager
 @contextmanager
@@ -152,20 +164,105 @@ def init_db():
             
         conn.commit()
 
-# Audit logging
+def get_usb_drives():
+    """Auto-detect USB drives on Windows"""
+    usb_drives = []
+    for letter in 'DEFGHIJKLMNOPQRSTUVWXYZ':
+        drive = f"{letter}:\\"
+        if os.path.exists(drive):
+            try:
+                import ctypes
+                kernel32 = ctypes.windll.kernel32
+                volume_name = ctypes.create_unicode_buffer(1024)
+                if kernel32.GetVolumeInformationW(ctypes.c_wchar_p(drive), volume_name, 1024, None, None, None, None, 0):
+                    usb_drives.append(drive)
+            except:
+                continue
+    return usb_drives
+
+def create_backup(silent=True):
+    """Create backup - auto-copies to USB if available"""
+    if not os.path.exists(DB_PATH):
+        return False
+    
+    try:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_name = f"dulcis_backup_{timestamp}.db"
+        local_path = os.path.join(BACKUP_DIR, backup_name)
+        
+        # Copy to local backups folder
+        shutil.copy2(DB_PATH, local_path)
+        
+        # Auto-copy to USB drive
+        usb_drives = get_usb_drives()
+        usb_success = False
+        
+        for drive in usb_drives:
+            try:
+                usb_dir = os.path.join(drive, "DulcisPOS_Backup")
+                os.makedirs(usb_dir, exist_ok=True)
+                if shutil.disk_usage(drive).free > 10 * 1024 * 1024:
+                    shutil.copy2(local_path, os.path.join(usb_dir, backup_name))
+                    usb_success = True
+                    if not silent:
+                        try:
+                            winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+                        except:
+                            pass
+                    break
+            except:
+                continue
+        
+        # Delete old backups (keep only 7)
+        backups = sorted([f for f in os.listdir(BACKUP_DIR) if f.startswith('dulcis_backup_')], reverse=True)
+        while len(backups) > MAX_LOCAL_BACKUPS:
+            os.remove(os.path.join(BACKUP_DIR, backups.pop()))
+        
+        if not silent:
+            status = "USB + Local" if usb_success else "Local only"
+            print(f"✅ Backup created: {backup_name} ({status})")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Backup failed: {e}")
+        return False
+
+def auto_backup_loop():
+    """Background thread - backup every X minutes"""
+    while True:
+        create_backup(silent=True)
+        time.sleep(BACKUP_INTERVAL_MINUTES * 60)
+
+def usb_watcher():
+    """Background thread - detect USB insertion"""
+    last_drives = set()
+    while True:
+        try:
+            current_drives = set(get_usb_drives())
+            new_drives = current_drives - last_drives
+            if new_drives:
+                print(f"🔌 USB detected: {new_drives}")
+                time.sleep(2)
+                create_backup(silent=False)
+                print("💾 Backup copied to USB automatically!")
+            last_drives = current_drives
+            time.sleep(5)
+        except:
+            time.sleep(10)
+
+# Audit logging with XSS protection
 def log_audit(action, table_name=None, record_id=None, old_values=None, new_values=None):
+    safe_old = html.escape(str(old_values), quote=True) if old_values else None
+    safe_new = html.escape(str(new_values), quote=True) if new_values else None
+    
     with get_db() as conn:
         conn.execute("""
             INSERT INTO audit_log (user_id, action, table_name, record_id, old_values, new_values, ip_address)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
-            session.get('user_id'),
-            action,
-            table_name,
-            record_id,
-            str(old_values) if old_values else None,
-            str(new_values) if new_values else None,
-            request.remote_addr
+            session.get('user_id'), action, table_name, record_id,
+            safe_old, safe_new, request.remote_addr
         ))
         conn.commit()
 
@@ -235,16 +332,13 @@ def role_required(*roles):
 def check_admin_access():
     """Block non-admin users from accessing admin routes"""
     if request.path.startswith('/admin'):
-        # Allow access to admin login page
         if request.path == '/admin/login':
             return None
         
-        # Check if user is logged in
         if 'user_id' not in session:
             flash('Please login first.', 'warning')
             return redirect(url_for('login'))
         
-        # Check if user is admin
         if session.get('role') != 'admin':
             flash('Admin access required. Insufficient privileges.', 'danger')
             return redirect(url_for('pos'))
@@ -298,7 +392,6 @@ def login():
                     
                     log_audit("LOGIN_SUCCESS", "users", user['id'])
                     
-                    # If admin, redirect to admin dashboard
                     if user['role'] == 'admin':
                         return redirect(url_for('admin_dashboard'))
                     
@@ -346,7 +439,6 @@ def admin_login():
         password = request.form.get("password", "")
         
         with get_db() as conn:
-            # Only allow users with admin role
             user = conn.execute(
                 "SELECT * FROM users WHERE username = ? AND role = 'admin' AND is_active = 1", 
                 (username,)
@@ -939,11 +1031,21 @@ def internal_error(error):
 
 if __name__ == "__main__":
     init_db()
+    
+    # Start automatic backup system
+    print("💾 Starting automatic backup system...")
+    create_backup(silent=False)  # First backup immediately
+    
+    # Start background threads
+    threading.Thread(target=auto_backup_loop, daemon=True).start()
+    threading.Thread(target=usb_watcher, daemon=True).start()
+    
+    print(f"⏰ Auto-backup: Every {BACKUP_INTERVAL_MINUTES} minutes")
+    print("🔌 USB watcher: Active (backup copies immediately when USB inserted)")
+    print()
     print("🚀 Starting Dulcis POS...")
-    print("📍 Local: http://127.0.0.1:5000")
-    print("🌐 Network: http://0.0.0.0:5000")
-    print("🔒 Admin Login: http://127.0.0.1:5000/admin/login")
-    print("✅ 100% OFFLINE - No internet required")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    print("📍 http://127.0.0.1:5000")
+    print("🔒 Admin: http://127.0.0.1:5000/admin/login")
+    app.run(debug=False, host='0.0.0.0', port=5000)
 else:
     init_db()
