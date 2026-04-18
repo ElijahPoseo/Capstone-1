@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Barcode & QR Code Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POS - Dulcis & Café</title>
@@ -515,115 +518,297 @@
             font-weight: 600;
         }
         
-        /* Modal */
-        .modal {
-            display: none;
+        /* ============================================
+           MODAL STYLES - NEW STRUCTURE
+           ============================================ */
+        
+        /* Modal Overlay - Dark background covering full screen */
+        .modal-overlay {
+            display: none; /* Hidden by default */
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0, 0, 0, 0.7); /* Dark semi-transparent background */
             z-index: 1000;
+            /* Center the modal container */
             justify-content: center;
             align-items: center;
         }
         
-        .modal-content {
-            background: white;
-            border-radius: 12px;
-            max-width: 400px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
+        /* Show modal with flex to enable centering */
+        .modal-overlay.show {
+            display: flex;
         }
         
+        /* Modal Box - White popup container */
+        .modal-box {
+            background: white;
+            width: 90%;
+            max-width: 400px;
+            max-height: 85vh;
+            border-radius: 12px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            animation: modalSlideIn 0.3s ease-out;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        /* Modal Header */
+        .modal-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8f9fa;
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .close-x {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            line-height: 1;
+        }
+        
+        /* Modal Body - Scrollable content area */
+        .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+        
+        /* ============================================
+           RECEIPT STYLES INSIDE MODAL
+           ============================================ */
         .receipt {
-            padding: 2rem;
-            font-family: "Courier New", monospace;
+            font-family: "Courier New", Courier, monospace;
+            padding: 20px;
+            font-size: 13px;
+            line-height: 1.4;
         }
         
         .receipt-header {
             text-align: center;
-            margin-bottom: 1.5rem;
-            padding-bottom: 1rem;
-            border-bottom: 2px dashed #ddd;
+            border-bottom: 2px dashed #000;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
         }
         
         .receipt-header h2 {
-            font-size: 1.5rem;
-            margin-bottom: 0.5rem;
+            font-size: 20px;
+            margin-bottom: 5px;
+            letter-spacing: 2px;
+            font-weight: bold;
         }
         
-        .receipt-header p {
-            font-size: 0.85rem;
+        .receipt-subtitle {
+            font-size: 12px;
             color: #666;
-            margin: 0.25rem 0;
+            margin-bottom: 8px;
         }
         
-        .receipt-items {
-            margin-bottom: 1.5rem;
+        .receipt-info {
+            font-size: 11px;
+            color: #333;
+            margin: 2px 0;
         }
+        
+        .receipt-meta {
+            text-align: center;
+            font-size: 12px;
+            margin: 10px 0;
+        }
+        
+        .receipt-meta p {
+            margin: 3px 0;
+        }
+        
+        .receipt-divider {
+            border-top: 1px dashed #000;
+            margin: 10px 0;
+        }
+        
+        .receipt-divider.thick {
+            border-top: 2px solid #000;
+        }
+        
+        .receipt-items-container {
+            margin: 10px 0;
+        }
+        
+        .receipt-items-header {
+            display: flex;
+            font-weight: bold;
+            font-size: 12px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .col-item { flex: 1; text-align: left; }
+        .col-qty { width: 40px; text-align: center; }
+        .col-price { width: 70px; text-align: right; }
         
         .receipt-item {
             display: flex;
-            justify-content: space-between;
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
+            font-size: 12px;
+            margin: 4px 0;
         }
         
         .receipt-summary {
-            border-top: 2px dashed #ddd;
-            padding-top: 1rem;
-            margin-bottom: 1.5rem;
+            margin: 10px 0;
         }
         
-        .receipt-row {
+        .receipt-summary .summary-row {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 0.5rem;
+            font-size: 12px;
+            margin: 4px 0;
         }
         
-        .receipt-row.total {
-            font-weight: 700;
-            font-size: 1.1rem;
-            border-top: 1px solid #ddd;
-            padding-top: 0.5rem;
-            margin-top: 0.5rem;
+        .receipt-summary .summary-row.total {
+            font-weight: bold;
+            font-size: 14px;
+            border-top: 2px solid #000;
+            padding-top: 8px;
+            margin-top: 8px;
+        }
+        
+        .receipt-payment {
+            margin: 10px 0;
+            font-size: 12px;
+        }
+        
+        .payment-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+        }
+        
+        .receipt-codes {
+            text-align: center;
+            margin: 15px 0;
+        }
+        
+        #receipt-barcode {
+            max-width: 100%;
+            height: 50px;
+            margin-bottom: 10px;
+        }
+        
+        #receipt-qrcode {
+            margin: 0 auto;
         }
         
         .receipt-footer {
             text-align: center;
-            padding-top: 1rem;
-            border-top: 2px dashed #ddd;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 2px dashed #000;
         }
         
-        .receipt-footer p {
-            margin-bottom: 1rem;
+        .receipt-footer .thanks {
+            font-weight: bold;
+            font-size: 13px;
+            margin-bottom: 5px;
+        }
+        
+        .receipt-footer .legal {
+            font-size: 11px;
             color: #666;
+            margin-bottom: 10px;
         }
         
-        .receipt-footer button {
-            margin: 0 0.25rem;
+        .receipt-footer .policy {
+            font-size: 10px;
+            color: #999;
         }
         
-        /* Cancel Modal */
-        .cancel-modal-content {
-            padding: 1.5rem;
+        /* Modal Footer - Action buttons */
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #e0e0e0;
+            background: #f8f9fa;
+            display: flex;
+            gap: 10px;
         }
         
-        .cancel-modal-content h3 {
+        .modal-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .modal-btn:hover {
+            opacity: 0.9;
+        }
+        
+        .modal-btn.btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .modal-btn.btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+        
+        .modal-btn.btn-success {
+            background: #10b981;
+            color: white;
+        }
+        
+        /* Cancel Modal Specific */
+        .cancel-content {
+            padding: 20px;
+        }
+        
+        .cancel-content h3 {
             margin-bottom: 1rem;
             color: #1a1a2e;
         }
         
-        .cancel-modal-content p {
+        .cancel-content p {
             color: #666;
             margin-bottom: 1rem;
             font-size: 0.9rem;
         }
         
-        .cancel-modal-content textarea {
+        .cancel-content label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .cancel-content textarea {
             width: 100%;
             padding: 0.75rem;
             border: 1px solid #ddd;
@@ -633,27 +818,27 @@
             resize: vertical;
         }
         
-        .cancel-modal-content .btn-group {
-            display: flex;
-            gap: 0.5rem;
-            justify-content: flex-end;
-        }
-        
+        /* Print optimization for 80mm thermal paper */
         @media print {
-            body * {
-                visibility: hidden;
-            }
-            .receipt, .receipt * {
-                visibility: visible;
-            }
-            .receipt {
+            .modal-overlay {
                 position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
+                background: white;
             }
-            .receipt-footer {
-                display: none;
+            
+            .modal-header, .modal-footer {
+                display: none !important;
+            }
+            
+            .modal-box {
+                box-shadow: none;
+                width: 100%;
+                max-width: 80mm;
+                max-height: none;
+                border-radius: 0;
+            }
+            
+            .modal-body {
+                overflow: visible;
             }
         }
         
@@ -671,6 +856,11 @@
             
             .products-section {
                 height: 60vh;
+            }
+            
+            .modal-box {
+                width: 95%;
+                max-height: 90vh;
             }
         }
     </style>
@@ -824,50 +1014,125 @@
         </div>
     </div>
 
-    <!-- Receipt Modal -->
-    <div class="modal" id="receipt-modal">
-        <div class="modal-content receipt">
-            <div class="receipt-header">
-                <h2>Dulcis & Café</h2>
-                <p id="receipt-datetime"></p>
-                <p id="receipt-transaction"></p>
+    <!-- ============================================
+         RECEIPT MODAL - NEW STRUCTURE
+         ============================================ -->
+    <div class="modal-overlay" id="receipt-modal" onclick="closeModalOutside(event, 'receipt-modal')">
+        <div class="modal-box">
+            <!-- Header -->
+            <div class="modal-header">
+                <span class="modal-title">Transaction Receipt</span>
+                <button class="close-x" onclick="closeReceipt()">×</button>
             </div>
-            <div class="receipt-items" id="receipt-items"></div>
-            <div class="receipt-summary">
-                <div class="receipt-row">
-                    <span>Subtotal:</span>
-                    <span id="receipt-subtotal"></span>
-                </div>
-                <div class="receipt-row">
-                    <span>Tax:</span>
-                    <span id="receipt-tax"></span>
-                </div>
-                <div class="receipt-row total">
-                    <span>Total:</span>
-                    <span id="receipt-total"></span>
+            
+            <!-- Scrollable Body with Receipt -->
+            <div class="modal-body">
+                <div class="receipt" id="receipt-content">
+                    <div class="receipt-header">
+                        <h2>Dulcis & Café</h2>
+                        <p class="receipt-subtitle">Premium Coffee & Pastries</p>
+                        <p class="receipt-info">123 Main Street, Manila</p>
+                        <p class="receipt-info">Tel: (02) 8123-4567 | Tax ID: 123-456-789-000</p>
+                    </div>
+                    
+                    <div class="receipt-meta">
+                        <p id="receipt-datetime"></p>
+                        <p>Transaction: <span id="receipt-transaction"></span></p>
+                        <p>Cashier: <span id="receipt-cashier"></span></p>
+                    </div>
+                    
+                    <div class="receipt-divider"></div>
+                    
+                    <div class="receipt-items-container">
+                        <div class="receipt-items-header">
+                            <span class="col-item">Item</span>
+                            <span class="col-qty">Qty</span>
+                            <span class="col-price">Price</span>
+                        </div>
+                        <div id="receipt-items"></div>
+                    </div>
+                    
+                    <div class="receipt-divider thick"></div>
+                    
+                    <div class="receipt-summary">
+                        <div class="summary-row">
+                            <span>Subtotal:</span>
+                            <span id="receipt-subtotal"></span>
+                        </div>
+                        <div class="summary-row">
+                            <span>Tax (12% VAT):</span>
+                            <span id="receipt-tax"></span>
+                        </div>
+                        <div class="summary-row total">
+                            <span>TOTAL:</span>
+                            <span id="receipt-total"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="receipt-payment">
+                        <div class="payment-row">
+                            <span>Payment Method:</span>
+                            <span id="receipt-payment-method">Cash</span>
+                        </div>
+                        <div class="payment-row">
+                            <span>Amount Received:</span>
+                            <span id="receipt-received"></span>
+                        </div>
+                        <div class="payment-row">
+                            <span>Change:</span>
+                            <span id="receipt-change"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="receipt-codes">
+                        <svg id="receipt-barcode"></svg>
+                        <canvas id="receipt-qrcode"></canvas>
+                    </div>
+                    
+                    <div class="receipt-footer">
+                        <p class="thanks">Thank you for your purchase!</p>
+                        <p class="legal">This serves as your official receipt</p>
+                        <p class="policy">Keep this receipt for returns within 7 days.<br>Returns require original packaging.</p>
+                    </div>
                 </div>
             </div>
-            <div class="receipt-footer">
-                <p>Thank you for your purchase!</p>
-                <button class="btn btn-primary" onclick="closeReceipt()">New Sale</button>
-                <button class="btn" onclick="printReceipt()" style="background:#e0e0e0;">Print</button>
+            
+            <!-- Footer with Action Buttons -->
+            <div class="modal-footer">
+                <button class="modal-btn btn-secondary" onclick="closeReceipt()">Close</button>
+                <button class="modal-btn btn-success" onclick="printReceipt()">🖨️ Print</button>
+                <button class="modal-btn btn-primary" onclick="newSale()">New Sale</button>
             </div>
         </div>
     </div>
 
-    <!-- Cancel Order Modal -->
-    <div class="modal" id="cancel-modal">
-        <div class="modal-content cancel-modal-content">
-            <h3>⚠️ Cancel Order</h3>
-            <p>You are about to cancel order: <strong id="cancel-order-id"></strong></p>
-            <p>This will restore the stock and cannot be undone.</p>
+    <!-- ============================================
+         CANCEL ORDER MODAL - NEW STRUCTURE
+         ============================================ -->
+    <div class="modal-overlay" id="cancel-modal" onclick="closeModalOutside(event, 'cancel-modal')">
+        <div class="modal-box" style="max-width: 400px;">
+            <!-- Header -->
+            <div class="modal-header">
+                <span class="modal-title">Cancel Order</span>
+                <button class="close-x" onclick="closeCancelModal()">×</button>
+            </div>
             
-            <label>Reason for cancellation (required):</label>
-            <textarea id="cancel-reason" rows="3" placeholder="e.g., Customer changed mind, Wrong items, etc."></textarea>
+            <!-- Body -->
+            <div class="modal-body">
+                <div class="cancel-content">
+                    <h3>⚠️ Warning</h3>
+                    <p>You are about to cancel order: <strong id="cancel-order-id"></strong></p>
+                    <p>This will restore the stock and cannot be undone.</p>
+                    
+                    <label>Reason for cancellation (required):</label>
+                    <textarea id="cancel-reason" rows="3" placeholder="e.g., Customer changed mind, Wrong items, etc."></textarea>
+                </div>
+            </div>
             
-            <div class="btn-group">
-                <button class="btn" onclick="closeCancelModal()" style="background:#e0e0e0;">Keep Order</button>
-                <button class="btn btn-danger" onclick="confirmCancel()">Yes, Cancel Order</button>
+            <!-- Footer -->
+            <div class="modal-footer">
+                <button class="modal-btn btn-secondary" onclick="closeCancelModal()">Keep Order</button>
+                <button class="modal-btn btn-danger" onclick="confirmCancel()" style="background: #ef4444; color: white;">Yes, Cancel Order</button>
             </div>
         </div>
     </div>
@@ -1077,52 +1342,100 @@
             }
         }
 
+        // ============================================
+        // RECEIPT MODAL FUNCTIONS
+        // ============================================
+        
         function showReceipt(saleData) {
             const modal = document.getElementById('receipt-modal');
             const now = new Date();
             
+            // Basic info
             document.getElementById('receipt-datetime').textContent = now.toLocaleString();
-            document.getElementById('receipt-transaction').textContent = `Transaction: ${saleData.transaction_id}`;
+            document.getElementById('receipt-transaction').textContent = saleData.transaction_id;
+            document.getElementById('receipt-cashier').textContent = sessionStorage.getItem('username') || 'Cashier';
             
+            // Calculate totals
             const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-            const tax = subtotal * TAX_RATE;
+            const tax = subtotal * 0.12;
+            const total = subtotal + tax;
             
+            // Render items
             document.getElementById('receipt-items').innerHTML = cart.map(item => `
                 <div class="receipt-item">
-                    <span>${item.name} x${item.quantity}</span>
-                    <span>₱${(item.price * item.quantity).toFixed(2)}</span>
+                    <span class="col-item">${item.name.substring(0, 20)}</span>
+                    <span class="col-qty">${item.quantity}</span>
+                    <span class="col-price">₱${(item.price * item.quantity).toFixed(2)}</span>
                 </div>
             `).join('');
             
+            // Update totals
             document.getElementById('receipt-subtotal').textContent = `₱${subtotal.toFixed(2)}`;
             document.getElementById('receipt-tax').textContent = `₱${tax.toFixed(2)}`;
-            document.getElementById('receipt-total').textContent = `₱${saleData.total.toFixed(2)}`;
+            document.getElementById('receipt-total').textContent = `₱${total.toFixed(2)}`;
             
-            modal.style.display = 'flex';
+            // Payment info - FIXED: Use JavaScript string method
+            const paymentMethod = document.querySelector('input[name="payment"]:checked')?.value || 'cash';
+            document.getElementById('receipt-payment-method').textContent = paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1);
+            
+            const received = parseFloat(document.getElementById('amount-received').value) || total;
+            document.getElementById('receipt-received').textContent = `₱${received.toFixed(2)}`;
+            document.getElementById('receipt-change').textContent = `₱${(received - total).toFixed(2)}`;
+            
+            // Generate barcode
+            if (typeof JsBarcode !== 'undefined') {
+                JsBarcode("#receipt-barcode", saleData.transaction_id, {
+                    format: "CODE128",
+                    width: 2,
+                    height: 40,
+                    displayValue: true,
+                    fontSize: 10,
+                    margin: 0
+                });
+            }
+            
+            // Generate QR code
+            if (typeof QRCode !== 'undefined') {
+                QRCode.toCanvas(document.getElementById("receipt-qrcode"), 
+                    `https://dulcis.cafe/receipt/${saleData.transaction_id}`, 
+                    { width: 80, margin: 1 }
+                );
+            }
+            
+            // Show modal using new structure
+            modal.classList.add('show');
         }
 
         function closeReceipt() {
-            document.getElementById('receipt-modal').style.display = 'none';
+            const modal = document.getElementById('receipt-modal');
+            modal.classList.remove('show');
+        }
+
+        function newSale() {
+            closeReceipt();
             cart = [];
             renderCart();
             document.getElementById('amount-received').value = '';
-            location.reload(); // Refresh to show new order in recent list
+            location.reload();
         }
 
         function printReceipt() {
             window.print();
         }
 
-        // Cancel Order Functions
+        // ============================================
+        // CANCEL MODAL FUNCTIONS
+        // ============================================
+        
         function showCancelModal(saleId, transactionId) {
             currentCancelId = saleId;
             document.getElementById('cancel-order-id').textContent = transactionId;
             document.getElementById('cancel-reason').value = '';
-            document.getElementById('cancel-modal').style.display = 'flex';
+            document.getElementById('cancel-modal').classList.add('show');
         }
 
         function closeCancelModal() {
-            document.getElementById('cancel-modal').style.display = 'none';
+            document.getElementById('cancel-modal').classList.remove('show');
             currentCancelId = null;
         }
 
@@ -1149,7 +1462,7 @@
                 
                 if (result.success) {
                     alert('Order cancelled successfully!');
-                    location.reload(); // Refresh to show updated status
+                    location.reload();
                 } else {
                     alert('Error: ' + (result.error || 'Failed to cancel order'));
                 }
@@ -1160,11 +1473,24 @@
             closeCancelModal();
         }
 
-        window.onclick = function(event) {
-            if (event.target.classList.contains('modal')) {
-                event.target.style.display = 'none';
+        // Close modal when clicking outside
+        function closeModalOutside(event, modalId) {
+            if (event.target === document.getElementById(modalId)) {
+                if (modalId === 'receipt-modal') {
+                    closeReceipt();
+                } else if (modalId === 'cancel-modal') {
+                    closeCancelModal();
+                }
             }
         }
+
+        // Close on Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeReceipt();
+                closeCancelModal();
+            }
+        });
     </script>
 </body>
 </html>

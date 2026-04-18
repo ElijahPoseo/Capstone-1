@@ -1,0 +1,431 @@
+<!-- templates/pos_receipt_enhanced.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt - Dulcis & Café</title>
+    <style>
+        /* Screen Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f5f5f5;
+            padding: 2rem;
+        }
+        
+        .receipt-container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        
+        /* Receipt Paper Styles - Optimized for 80mm thermal printers */
+        .receipt-paper {
+            font-family: "Courier New", "Courier", monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            color: #000;
+            background: white;
+            padding: 10px;
+            width: 100%;
+            max-width: 320px; /* 80mm paper width */
+            margin: 0 auto;
+        }
+        
+        .receipt-header {
+            text-align: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px dashed #000;
+        }
+        
+        .receipt-logo {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .receipt-title {
+            font-size: 12px;
+            margin-bottom: 3px;
+        }
+        
+        .receipt-info {
+            font-size: 11px;
+            color: #333;
+        }
+        
+        .receipt-divider {
+            border-top: 1px dashed #000;
+            margin: 10px 0;
+        }
+        
+        .receipt-divider.thick {
+            border-top: 2px solid #000;
+        }
+        
+        .receipt-items {
+            width: 100%;
+            margin: 10px 0;
+        }
+        
+        .receipt-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+        
+        .receipt-item-name {
+            flex: 1;
+            text-align: left;
+        }
+        
+        .receipt-item-qty {
+            width: 30px;
+            text-align: center;
+        }
+        
+        .receipt-item-price {
+            width: 70px;
+            text-align: right;
+        }
+        
+        .receipt-summary {
+            margin-top: 10px;
+        }
+        
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3px;
+        }
+        
+        .summary-row.total {
+            font-weight: bold;
+            font-size: 14px;
+            border-top: 2px solid #000;
+            padding-top: 5px;
+            margin-top: 5px;
+        }
+        
+        .receipt-payment {
+            margin-top: 10px;
+            font-size: 11px;
+        }
+        
+        .receipt-footer {
+            text-align: center;
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 2px dashed #000;
+            font-size: 11px;
+        }
+        
+        .barcode-container {
+            text-align: center;
+            margin: 10px 0;
+            padding: 5px;
+        }
+        
+        .barcode-container svg {
+            max-width: 100%;
+            height: 50px;
+        }
+        
+        .qr-container {
+            text-align: center;
+            margin: 10px 0;
+        }
+        
+        .qr-container canvas {
+            margin: 0 auto;
+        }
+        
+        /* Action Buttons */
+        .actions {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+        
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+        
+        /* Print Styles - Optimized for thermal printers */
+        @media print {
+            @page {
+                size: 80mm auto;
+                margin: 0;
+            }
+            
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .receipt-container {
+                box-shadow: none;
+                border-radius: 0;
+                max-width: 80mm;
+                padding: 0;
+            }
+            
+            .actions, .btn {
+                display: none !important;
+            }
+            
+            .receipt-paper {
+                max-width: 100%;
+                padding: 5mm;
+            }
+        }
+        
+        /* Thermal Printer Specific */
+        @media print and (max-width: 80mm) {
+            .receipt-paper {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt-container">
+        <div class="receipt-paper" id="receipt-content">
+            <div class="receipt-header">
+                <div class="receipt-logo">DULCIS & CAFÉ</div>
+                <div class="receipt-title">Premium Coffee & Pastries</div>
+                <div class="receipt-info">
+                    <div>123 Main Street, Manila</div>
+                    <div>Tel: (02) 8123-4567</div>
+                    <div>Tax ID: 123-456-789-000</div>
+                </div>
+            </div>
+            
+            <div class="receipt-info" style="text-align: center; margin: 10px 0;">
+                <div id="receipt-datetime">2024-01-15 14:30:25</div>
+                <div>Transaction: <span id="receipt-transaction">TXN-20240115143025-A1B2</span></div>
+                <div>Cashier: <span id="receipt-cashier">admin</span></div>
+            </div>
+            
+            <div class="receipt-divider"></div>
+            
+            <div class="receipt-items" id="receipt-items">
+                <div class="receipt-item">
+                    <span class="receipt-item-name">Cappuccino (Hot)</span>
+                    <span class="receipt-item-qty">1</span>
+                    <span class="receipt-item-price">₱150.00</span>
+                </div>
+                <div class="receipt-item">
+                    <span class="receipt-item-name">Chocolate Croissant</span>
+                    <span class="receipt-item-qty">2</span>
+                    <span class="receipt-item-price">₱240.00</span>
+                </div>
+            </div>
+            
+            <div class="receipt-divider thick"></div>
+            
+            <div class="receipt-summary">
+                <div class="summary-row">
+                    <span>Subtotal:</span>
+                    <span id="receipt-subtotal">₱390.00</span>
+                </div>
+                <div class="summary-row">
+                    <span>Tax (12% VAT):</span>
+                    <span id="receipt-tax">₱46.80</span>
+                </div>
+                <div class="summary-row total">
+                    <span>TOTAL:</span>
+                    <span id="receipt-total">₱436.80</span>
+                </div>
+            </div>
+            
+            <div class="receipt-payment">
+                <div class="summary-row">
+                    <span>Payment Method:</span>
+                    <span id="receipt-payment-method">Cash</span>
+                </div>
+                <div class="summary-row">
+                    <span>Amount Received:</span>
+                    <span id="receipt-received">₱500.00</span>
+                </div>
+                <div class="summary-row">
+                    <span>Change:</span>
+                    <span id="receipt-change">₱63.20</span>
+                </div>
+            </div>
+            
+            <div class="barcode-container">
+                <svg id="barcode"></svg>
+            </div>
+            
+            <div class="qr-container">
+                <canvas id="qrcode"></canvas>
+            </div>
+            
+            <div class="receipt-footer">
+                <div>Thank you for your purchase!</div>
+                <div style="margin-top: 5px; font-size: 10px;">This serves as your official receipt</div>
+                <div style="margin-top: 10px; font-size: 9px;">
+                    Keep this receipt for returns within 7 days.<br>
+                    Returns require original packaging.
+                </div>
+            </div>
+        </div>
+        
+        <div class="actions">
+            <button class="btn btn-primary" onclick="window.print()">🖨️ Print Receipt</button>
+            <button class="btn btn-success" onclick="sendToThermalPrinter()">🔥 Thermal Print</button>
+            <button class="btn btn-secondary" onclick="emailReceipt()">📧 Email</button>
+            <button class="btn btn-secondary" onclick="newSale()">New Sale</button>
+        </div>
+    </div>
+    
+    <!-- Include JsBarcode for barcode generation -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <!-- Include QRCode.js for QR generation -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    
+    <script>
+        // Generate barcode
+        function generateBarcode(transactionId) {
+            JsBarcode("#barcode", transactionId, {
+                format: "CODE128",
+                width: 2,
+                height: 40,
+                displayValue: true,
+                fontSize: 10,
+                margin: 0
+            });
+        }
+        
+        // Generate QR code
+        function generateQR(data) {
+            QRCode.toCanvas(document.getElementById("qrcode"), data, {
+                width: 80,
+                margin: 1
+            });
+        }
+        
+        // Update receipt with sale data
+        function updateReceipt(saleData) {
+            document.getElementById('receipt-datetime').textContent = saleData.datetime;
+            document.getElementById('receipt-transaction').textContent = saleData.transaction_id;
+            document.getElementById('receipt-cashier').textContent = saleData.cashier;
+            
+            // Render items
+            const itemsContainer = document.getElementById('receipt-items');
+            itemsContainer.innerHTML = saleData.items.map(item => `
+                <div class="receipt-item">
+                    <span class="receipt-item-name">${item.name}</span>
+                    <span class="receipt-item-qty">${item.quantity}</span>
+                    <span class="receipt-item-price">₱${item.total.toFixed(2)}</span>
+                </div>
+            `).join('');
+            
+            // Update totals
+            document.getElementById('receipt-subtotal').textContent = `₱${saleData.subtotal.toFixed(2)}`;
+            document.getElementById('receipt-tax').textContent = `₱${saleData.tax.toFixed(2)}`;
+            document.getElementById('receipt-total').textContent = `₱${saleData.total.toFixed(2)}`;
+            document.getElementById('receipt-payment-method').textContent = saleData.payment_method;
+            document.getElementById('receipt-received').textContent = `₱${saleData.received.toFixed(2)}`;
+            document.getElementById('receipt-change').textContent = `₱${saleData.change.toFixed(2)}`;
+            
+            // Generate codes
+            generateBarcode(saleData.transaction_id);
+            generateQR(`https://dulcis.cafe/receipt/${saleData.transaction_id}`);
+        }
+        
+        // Send to thermal printer via API
+        async function sendToThermalPrinter() {
+            const receiptData = {
+                content: document.getElementById('receipt-content').innerHTML,
+                transaction_id: document.getElementById('receipt-transaction').textContent,
+                printer_type: 'thermal'
+            };
+            
+            try {
+                const response = await fetch('/api/print/receipt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(receiptData)
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('Receipt sent to thermal printer!');
+                } else {
+                    alert('Print failed: ' + result.error);
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+            }
+        }
+        
+        // Email receipt
+        async function emailReceipt() {
+            const email = prompt('Enter customer email:');
+            if (!email) return;
+            
+            try {
+                const response = await fetch('/api/receipt/email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        transaction_id: document.getElementById('receipt-transaction').textContent,
+                        email: email
+                    })
+                });
+                
+                const result = await response.json();
+                alert(result.message || 'Receipt emailed!');
+            } catch (error) {
+                alert('Failed to send email: ' + error.message);
+            }
+        }
+        
+        function newSale() {
+            if (confirm('Start a new sale?')) {
+                window.location.href = '/pos';
+            }
+        }
+        
+        // Initialize with sample data
+        window.onload = function() {
+            generateBarcode('TXN-20240115143025-A1B2');
+            generateQR('https://dulcis.cafe/receipt/TXN-20240115143025-A1B2');
+        };
+    </script>
+</body>
+</html>
