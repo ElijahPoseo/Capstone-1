@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base target="_self">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberLedger | Admin Panel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <script src="{{ url_for('static', filename='js/timezone.js') }}"></script>
+    <style>
+        /* Page header */
+        .page-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 0.25rem;
+        }
+        
+        .page-subtitle {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 1.5rem;
+        }
+        
+        /* Stats bar */
+        .stats-bar {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .stat-chip {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
+        }
+        
+        .stat-chip.alt {
+            background: white;
+            color: #374151;
+            border: 1px solid #e5e7eb;
+            box-shadow: none;
+        }
+        
+        .stat-chip strong {
+            font-size: 1.1rem;
+        }
+        
+        /* Controls bar */
+        .controls-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding: 0.75rem 1rem;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .report-form {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        
+        .report-form label {
+            font-size: 0.85rem;
+            color: #6b7280;
+            font-weight: 500;
+        }
+        
+        .report-form input {
+            padding: 0.4rem 0.6rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            width: 125px;
+        }
+        
+        /* Table container */
+        .table-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+        }
+        
+        /* Table - use auto layout for better distribution */
+        .ledger-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        
+        .ledger-table thead {
+            background: #f9fafb;
+        }
+        
+        .ledger-table th {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 2px solid #e5e7eb;
+            white-space: nowrap;
+        }
+        
+        .ledger-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f3f4f6;
+            vertical-align: middle;
+        }
+        
+        .ledger-table tbody tr:hover {
+            background: #f9fafb;
+        }
+        
+        .ledger-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
+        /* Column specific widths - hash moved to middle-right */
+        .col-time { width: 140px; }
+        .col-user { width: 100px; }
+        .col-action { width: 90px; }
+        .col-hash { width: 110px; }
+        .col-details { width: auto; }
+        
+        /* Cell styling */
+        .cell-time {
+            font-family: 'SF Mono', monospace;
+            color: #667eea;
+            font-size: 0.75rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        
+        .cell-user {
+            color: #059669;
+            font-weight: 600;
+            font-size: 0.8rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 100px;
+        }
+        
+        .cell-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+        
+        .action-sale { background: #d1fae5; color: #065f46; }
+        .action-cancel { background: #fee2e2; color: #991b1b; }
+        .action-stock-in { background: #dbeafe; color: #1e40af; }
+        .action-stock-out { background: #fef3c7; color: #92400e; }
+        .action-adjust { background: #f3e8ff; color: #6b21a8; }
+        .action-product { background: #e0f2fe; color: #0c4a6e; }
+        .action-user { background: #fce7f3; color: #9d174d; }
+        .action-login { background: #ecfdf5; color: #059669; }
+        .action-logout { background: #f3f4f6; color: #6b7280; }
+        .action-audit { background: #fef3c7; color: #92400e; }
+        .action-other { background: #f3f4f6; color: #374151; }
+        
+        .cell-action::before {
+            content: "";
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: currentColor;
+            opacity: 0.5;
+        }
+        
+        /* Hash cell - moved to middle, cleaner look */
+        .cell-hash {
+            font-family: 'SF Mono', monospace;
+            font-size: 0.7rem;
+            color: #8b5cf6;
+            background: #f5f3ff;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            display: inline-block;
+            max-width: 90px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        /* Details cell - single line layout */
+        .cell-details {
+            color: #374151;
+            font-size: 0.8rem;
+        }
+        
+        /* Single row layout for details */
+        .detail-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .detail-main {
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .detail-meta {
+            color: #6b7280;
+            font-size: 0.75rem;
+        }
+        
+        .detail-separator {
+            color: #d1d5db;
+        }
+        
+        /* Tags inline */
+        .inline-tags {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+        
+        .item-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.15rem;
+            background: #f3f4f6;
+            padding: 0.1rem 0.35rem;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            color: #374151;
+        }
+        
+        .item-tag .qty {
+            font-weight: 700;
+            color: #667eea;
+        }
+        
+        .amount-tag {
+            display: inline-flex;
+            align-items: center;
+            background: #667eea;
+            color: white;
+            padding: 0.1rem 0.4rem;
+            border-radius: 3px;
+            font-weight: 700;
+            font-size: 0.75rem;
+        }
+        
+        .payment-method {
+            color: #6b7280;
+            font-size: 0.75rem;
+        }
+        
+        .customer-name {
+            color: #9ca3af;
+            font-size: 0.75rem;
+        }
+        
+        /* Audit info - single line */
+        .audit-inline {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.78rem;
+        }
+        
+        .audit-item {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        
+        .audit-label {
+            color: #9ca3af;
+            font-size: 0.7rem;
+        }
+        
+        .audit-value {
+            color: #374151;
+            font-weight: 500;
+        }
+        
+        /* Transaction ID short */
+        .txn-short {
+            font-family: 'SF Mono', monospace;
+            font-size: 0.75rem;
+            color: #6b7280;
+            background: #f3f4f6;
+            padding: 0.1rem 0.35rem;
+            border-radius: 3px;
+        }
+        
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #9ca3af;
+        }
+        
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+        
+        /* Pagination */
+        .pagination-bar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+            padding: 1rem;
+        }
+        
+        .pagination-bar a,
+        .pagination-bar span {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .pagination-bar a {
+            background: white;
+            color: #374151;
+            border: 1px solid #e5e7eb;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        
+        .pagination-bar a:hover {
+            background: #f9fafb;
+            border-color: #d1d5db;
+        }
+        
+        .pagination-bar .current {
+            background: #667eea;
+            color: white;
+        }
+        
+        .pagination-bar .disabled {
+            color: #d1d5db;
+            cursor: not-allowed;
+        }
+    </style>
+<base target="_blank">
+</head>
+<body class="admin-body">
+    <div class="admin-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Admin Panel</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-item">Dashboard</a>
+                <a href="{{ url_for('admin_products') }}" class="nav-item">Products</a>
+                <a href="{{ url_for('admin_sales') }}" class="nav-item">Sales</a>
+                <a href="{{ url_for('admin_users') }}" class="nav-item">Users</a>
+                <a href="{{ url_for('admin_reports') }}" class="nav-item">Reports</a>
+                <a href="{{ url_for('admin_audit_log') }}" class="nav-item">Audit Log</a>
+                <a href="{{ url_for('admin_ledger') }}" class="nav-item active">🔐 Ledger</a>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="{{ url_for('pos') }}" class="nav-item">🛒 Back to POS</a>
+                <a href="{{ url_for('logout') }}" class="nav-item">🚪 Logout</a>
+            </div>
+        </aside>
+
+        <main class="admin-main">
+            <header class="admin-header">
+                <div>
+                    <h1 class="page-title">🔐 CyberLedger</h1>
+                    <p class="page-subtitle">Immutable transaction log with SHA-256 verification</p>
+                </div>
+                <span id="local-clock" style="color: #667eea; font-weight: 600; font-size: 0.9rem;"></span>
+            </header>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- Stats -->
+            <div class="stats-bar">
+                <div class="stat-chip">
+                    <span>Total Entries</span>
+                    <strong>{{ stats['total'] }}</strong>
+                </div>
+                {% for action, count in stats['by_type'].items() %}
+                <div class="stat-chip alt">
+                    <span>{{ action | replace('_', ' ') }}</span>
+                    <strong>{{ count }}</strong>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Controls -->
+            <div class="controls-bar">
+                <form method="POST" action="{{ url_for('generate_ledger_report') }}" class="report-form">
+                    <label>Export to PDF:</label>
+                    <input type="date" name="date_from" required>
+                    <span style="color: #d1d5db;">→</span>
+                    <input type="date" name="date_to" required>
+                    <button type="submit" class="btn btn-primary">
+                        📄 Download PDF
+                    </button>
+                </form>
+                <div style="font-size: 0.85rem; color: #6b7280;">
+                    Showing {{ entries | length }} entries
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-container">
+                <table class="ledger-table">
+                    <thead>
+                        <tr>
+                            <th class="col-time">Timestamp</th>
+                            <th class="col-user">User</th>
+                            <th class="col-action">Action</th>
+                            <th class="col-hash">Hash</th>
+                            <th class="col-details">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in entries %}
+                        <tr>
+                            <td>
+                                <span class="cell-time" data-utc="{{ entry.timestamp }}">{{ entry.timestamp }}</span>
+                            </td>
+                            <td>
+                                {% set d = entry.details %}
+                                {% set display_user = d.get('cashier') or d.get('username') or d.get('by') or ('#' ~ entry.user_id) %}
+                                <span class="cell-user" title="{{ display_user }}">{{ display_user }}</span>
+                            </td>
+                            <td>
+                                {% set a = entry.action %}
+                                {% if a == 'SALE_CREATED' %}
+                                    <span class="cell-action action-sale">Sale</span>
+                                {% elif a == 'SALE_CANCELLED' %}
+                                    <span class="cell-action action-cancel">Cancel</span>
+                                {% elif a == 'STOCK_IN' %}
+                                    <span class="cell-action action-stock-in">Stock In</span>
+                                {% elif a == 'STOCK_OUT' %}
+                                    <span class="cell-action action-stock-out">Stock Out</span>
+                                {% elif a == 'STOCK_ADJUSTMENT' %}
+                                    <span class="cell-action action-adjust">Adjust</span>
+                                {% elif 'PRODUCT' in a %}
+                                    <span class="cell-action action-product">{{ a | replace('PRODUCT_','') }}</span>
+                                {% elif 'USER' in a and 'LOGIN' not in a and 'LOGOUT' not in a %}
+                                    <span class="cell-action action-user">{{ a | replace('USER_','') }}</span>
+                                {% elif 'LOGIN' in a %}
+                                    <span class="cell-action action-login">Login</span>
+                                {% elif 'LOGOUT' in a %}
+                                    <span class="cell-action action-logout">Logout</span>
+                                {% elif 'AUDIT' in a %}
+                                    <span class="cell-action action-audit">Audit</span>
+                                {% else %}
+                                    <span class="cell-action action-other">{{ a }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="cell-hash" title="{{ entry.hash }}">{{ entry.hash[:10] }}</span>
+                            </td>
+                            <td>
+                                <div class="cell-details">
+                                    {% if a == 'SALE_CREATED' %}
+                                        <div class="detail-row">
+                                            {% if entry.items_list %}
+                                                <span class="inline-tags">
+                                                    {% for item in entry.items_list %}
+                                                        <span class="item-tag">
+                                                            <span class="qty">{{ item.get('qty', 0) }}×</span>{{ item.get('product', '?') }}
+                                                        </span>
+                                                    {% endfor %}
+                                                </span>
+                                            {% endif %}
+                                            <span class="amount-tag">₱{{ "%.2f" | format((d.get('total') or 0) | float) }}</span>
+                                            <span class="payment-method">{{ (d.get('payment_method') or 'Cash') | title }}</span>
+                                            {% if d.get('customer') and d.get('customer') != 'Walk-in Customer' %}
+                                                <span class="detail-separator">•</span>
+                                                <span class="customer-name">{{ d.get('customer') }}</span>
+                                            {% endif %}
+                                        </div>
+                                        
+                                    {% elif a == 'SALE_CANCELLED' %}
+                                        <div class="detail-row">
+                                            <span class="txn-short">{{ d.get('transaction_id','—')[-10:] }}</span>
+                                            <span class="detail-separator">•</span>
+                                            <span class="amount-tag" style="background: #ef4444;">₱{{ "%.2f" | format((d.get('total') or 0) | float) }}</span>
+                                            <span class="detail-separator">•</span>
+                                            <span class="detail-meta">{{ d.get('reason','—') }}</span>
+                                        </div>
+                                        
+                                    {% elif a == 'STOCK_IN' %}
+                                        <div class="detail-row">
+                                            <span class="detail-main">{{ d.get('product_name','—') }}</span>
+                                            <span class="detail-separator">•</span>
+                                            <span style="color: #3b82f6; font-weight: 600;">+{{ d.get('qty_in', 0) }} units</span>
+                                            {% if d.get('unit_price') %}
+                                                <span class="detail-separator">•</span>
+                                                <span class="detail-meta">₱{{ "%.2f" | format((d.get('unit_price') or 0) | float) }}</span>
+                                            {% endif %}
+                                        </div>
+                                        
+                                    {% elif a == 'STOCK_OUT' %}
+                                        <div class="detail-row">
+                                            <span class="detail-main">{{ d.get('product_name','—') }}</span>
+                                            <span class="detail-separator">•</span>
+                                            <span style="color: #f59e0b; font-weight: 600;">{{ d.get('qty_out', 0) }} sold</span>
+                                            <span class="detail-separator">•</span>
+                                            <span class="detail-meta">{{ d.get('customer','Walk-in') }}</span>
+                                        </div>
+                                        
+                                    {% elif a == 'STOCK_ADJUSTMENT' %}
+                                        <div class="detail-row">
+                                            <span class="detail-main">{{ d.get('product_name','—') }}</span>
+                                            <span class="detail-separator">•</span>
+                                            <span style="font-weight: 600;">{{ d.get('qty_adjusted', 0) }} units</span>
+                                            <span class="detail-separator">•</span>
+                                            <span class="detail-meta">{{ d.get('previous_stock','?') }} → {{ d.get('new_stock','?') }}</span>
+                                        </div>
+                                        
+                                    {% elif 'PRODUCT' in a %}
+                                        <div class="detail-row">
+                                            <span class="detail-main">{{ d.get('name') or d.get('product_name','—') }}</span>
+                                            {% if d.get('price') %}
+                                                <span class="detail-separator">•</span>
+                                                <span class="detail-meta">₱{{ "%.2f" | format((d.get('price') or 0) | float) }}</span>
+                                            {% endif %}
+                                        </div>
+                                        
+                                    {% elif 'USER' in a %}
+                                        <div class="detail-row">
+                                            <span class="detail-main">{{ d.get('username') or d.get('target_username','—') }}</span>
+                                            {% if d.get('role') %}
+                                                <span class="detail-separator">•</span>
+                                                <span class="detail-meta">{{ d.get('role') | title }}</span>
+                                            {% endif %}
+                                        </div>
+                                        
+                                    {% elif 'AUDIT' in a %}
+                                        <div class="audit-inline">
+                                            <span class="audit-item">
+                                                <span class="audit-label">Table:</span>
+                                                <span class="audit-value">{{ d.get('table', '—') }}</span>
+                                            </span>
+                                            {% if d.get('record_id') %}
+                                            <span class="audit-item">
+                                                <span class="audit-label">Record:</span>
+                                                <span class="audit-value">#{{ d.get('record_id') }}</span>
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                        
+                                    {% else %}
+                                        <div class="detail-row">
+                                            {% for key, value in d.items() if key not in ['items', 'cashier', 'username', 'by', 'customer'] %}
+                                                <span class="detail-meta">{{ key | replace('_', ' ') | title }}: {{ value }}</span>
+                                                {% if not loop.last %}<span class="detail-separator">•</span>{% endif %}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5">
+                                <div class="empty-state">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 64px; height: 64px; margin-bottom: 1rem; opacity: 0.3;">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                        <line x1="9" y1="9" x2="15" y2="15"/>
+                                        <line x1="15" y1="9" x2="9" y2="15"/>
+                                    </svg>
+                                    <h3>No entries found</h3>
+                                    <p>Transaction records will appear here once sales are processed.</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            <div class="pagination-bar">
+                {% if page > 1 %}
+                <a href="?page={{ page-1 }}">← Previous</a>
+                {% else %}
+                <span class="disabled">← Previous</span>
+                {% endif %}
+                
+                <span class="current">Page {{ page }}</span>
+                
+                <a href="?page={{ page+1 }}">Next →</a>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function updateClock() { 
+            document.getElementById('local-clock').textContent = new Date().toLocaleTimeString(); 
+        }
+        updateClock(); 
+        setInterval(updateClock, 1000);
+    </script>
+</body>
+</html>
