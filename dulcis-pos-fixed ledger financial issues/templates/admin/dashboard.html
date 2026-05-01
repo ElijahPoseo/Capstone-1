@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base target="_self">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | Dulcis POS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <!-- Timezone conversion script -->
+    <script src="{{ url_for('static', filename='js/timezone.js') }}"></script>
+<base target="_blank">
+</head>
+<body>
+    <div class="admin-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Admin Panel</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-item active">📊 Dashboard</a>
+                <a href="{{ url_for('admin_products') }}" class="nav-item">📦 Products</a>
+                <a href="{{ url_for('admin_sales') }}" class="nav-item">🧾 Sales</a>
+                <a href="{{ url_for('admin_users') }}" class="nav-item">👥 Users</a>
+                <a href="{{ url_for('admin_reports') }}" class="nav-item">📈 Reports</a>
+                <a href="{{ url_for('admin_audit_log') }}" class="nav-item">🔍 Audit Log</a>
+                <a href="{{ url_for('admin_ledger') }}" class="nav-item">🔐 Ledger</a>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="{{ url_for('pos') }}" class="nav-item">🛒 Back to POS</a>
+                <a href="{{ url_for('logout') }}" class="nav-item">🚪 Logout</a>
+            </div>
+        </aside>
+
+        <main class="admin-main">
+            <header class="admin-header">
+                <h1>Dashboard Overview</h1>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span id="local-clock" style="color: #667eea; font-weight: 600;"></span>
+                </div>
+            </header>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-label">Total Products</span>
+                    <span class="stat-value">{{ stats.total_products }}</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Low Stock Alerts</span>
+                    <span class="stat-value text-danger">{{ stats.low_stock }}</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Today's Revenue</span>
+                    <span class="stat-value">₱{{ "%.2f"|format(stats.today_sales) }}</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Active Users</span>
+                    <span class="stat-value">{{ stats.total_users }}</span>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+                <div class="card">
+                    <h3>Recent Transactions</h3>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Transaction ID</th>
+                                    <th>Cashier</th>
+                                    <th>Amount</th>
+                                    <th>Time (Local)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sale in recent_sales %}
+                                <tr>
+                                    <td>{{ sale.transaction_id }}</td>
+                                    <td>{{ sale.cashier_name }}</td>
+                                    <td>₱{{ "%.2f"|format(sale.total_amount) }}</td>
+                                    <!-- TIMEZONE FIX: Use data-utc attribute -->
+                                    <td data-utc="{{ sale.created_at }}">{{ sale.created_at }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Low Stock Alerts</h3>
+                    <div class="stock-alerts">
+                        {% for item in low_stock_items %}
+                        <div class="alert-item">
+                            <div>
+                                <span class="alert-name">{{ item.name }}</span>
+                                <span class="alert-meta">Stock: {{ item.stock }} / Min: {{ item.min_stock_level }}</span>
+                            </div>
+                            <span class="badge badge-warning">Low</span>
+                        </div>
+                        {% else %}
+                        <div class="text-center text-muted" style="padding:2rem;">
+                            All products are well stocked!
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
