@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base target="_self">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports | Manager Panel</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f3f4f6; min-height: 100vh; display: flex; }
+        .sidebar { width: 220px; background: #1f2937; min-height: 100vh; display: flex; flex-direction: column; flex-shrink: 0; }
+        .sidebar-header { padding: 1.5rem 1.25rem 1rem; border-bottom: 1px solid #374151; }
+        .sidebar-header h2 { color: white; font-size: 1rem; font-weight: 600; }
+        .sidebar-header span { display: inline-block; margin-top: 0.3rem; background: #059669; color: white; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 10px; text-transform: uppercase; }
+        .sidebar-nav { flex: 1; padding: 1rem 0; }
+        .nav-item { display: block; padding: 0.75rem 1.25rem; color: #9ca3af; text-decoration: none; font-size: 0.9rem; transition: all 0.15s; border-left: 3px solid transparent; }
+        .nav-item:hover { background: #374151; color: white; }
+        .nav-item.active { background: #374151; color: white; border-left-color: #667eea; }
+        .sidebar-footer { padding: 1rem 0; border-top: 1px solid #374151; }
+        .main { flex: 1; display: flex; flex-direction: column; }
+        .topbar { background: white; border-bottom: 1px solid #e5e7eb; padding: 1rem 1.5rem; }
+        .topbar h1 { font-size: 1.25rem; color: #1f2937; font-weight: 600; }
+        .content { padding: 1.5rem; }
+        .grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+        .card { background: white; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); overflow: hidden; margin-bottom: 1.5rem; }
+        .card-header { padding: 1rem 1.25rem; border-bottom: 1px solid #f3f4f6; font-weight: 600; color: #1f2937; }
+        .card-body { padding: 1.25rem; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        th { padding: 0.75rem 1.25rem; text-align: left; background: #f9fafb; color: #6b7280; font-size: 0.75rem; text-transform: uppercase; font-weight: 600; }
+        td { padding: 0.75rem 1.25rem; border-top: 1px solid #f3f4f6; color: #374151; }
+        @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2>StockSecure POS</h2>
+            <span>Manager</span>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('manager_dashboard') }}" class="nav-item">📊 Dashboard</a>
+            <a href="{{ url_for('manager_sales') }}" class="nav-item">🧾 Sales</a>
+            <a href="{{ url_for('manager_reports') }}" class="nav-item active">📈 Reports</a>
+            <a href="{{ url_for('manager_cancel_orders') }}" class="nav-item">❌ Cancel Orders</a>
+            <a href="{{ url_for('pos') }}" class="nav-item">🛒 POS</a>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="{{ url_for('logout') }}" class="nav-item">🚪 Logout</a>
+        </div>
+    </aside>
+
+    <div class="main">
+        <div class="topbar">
+            <h1>Sales Reports</h1>
+        </div>
+        <div class="content">
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">Daily Sales (Last 30 Days)</div>
+                    <div class="card-body">
+                        <canvas id="dailyChart" height="120"></canvas>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Sales by Category</div>
+                    <div class="card-body">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Top Selling Products</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Quantity Sold</th>
+                            <th>Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in top_products %}
+                        <tr>
+                            <td>{{ product.name }}</td>
+                            <td>{{ product.total_sold }}</td>
+                            <td>₱{{ "%.2f"|format(product.revenue) }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="3" style="text-align:center;padding:2rem;color:#9ca3af;">No data available.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dailyData = {{ daily_sales|tojson }};
+        new Chart(document.getElementById('dailyChart').getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: dailyData.map(d => d.date),
+                datasets: [{ label: 'Revenue (₱)', data: dailyData.map(d => d.revenue),
+                    borderColor: '#667eea', backgroundColor: 'rgba(102,126,234,0.1)', tension: 0.4, fill: true }]
+            },
+            options: { responsive: true, plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { callback: v => '₱' + v.toFixed(0) } } } }
+        });
+
+        const categoryData = {{ category_sales|tojson }};
+        new Chart(document.getElementById('categoryChart').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: categoryData.map(c => c.name),
+                datasets: [{ data: categoryData.map(c => c.revenue),
+                    backgroundColor: ['#667eea','#10b981','#f59e0b','#ef4444','#8b5cf6'] }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        });
+    </script>
+</body>
+</html>

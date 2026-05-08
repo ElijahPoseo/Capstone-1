@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base target="_self">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Printer Settings — Dulcis POS</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#f5f6ff; color:#1f2937; min-height:100vh; }
+
+        /* Header */
+        .page-header { background:linear-gradient(135deg,#667eea,#764ba2); color:white; padding:1.25rem 2rem; display:flex; align-items:center; gap:1rem; box-shadow:0 2px 12px rgba(102,126,234,0.3); }
+        .page-header h1 { font-size:1.25rem; font-weight:700; }
+        .page-header a { color:rgba(255,255,255,0.8); text-decoration:none; font-size:0.85rem; }
+        .page-header a:hover { color:white; }
+
+        /* Layout */
+        .page-body { max-width:960px; margin:2rem auto; padding:0 1.5rem 3rem; display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; }
+        @media(max-width:700px){ .page-body{grid-template-columns:1fr;} }
+
+        /* Cards */
+        .card { background:white; border-radius:14px; box-shadow:0 2px 12px rgba(102,126,234,0.08); overflow:hidden; }
+        .card-header { padding:1rem 1.25rem; border-bottom:1.5px solid #e0e3ff; display:flex; align-items:center; gap:0.6rem; }
+        .card-header h2 { font-size:1rem; font-weight:700; color:#374151; }
+        .card-header .icon { width:32px; height:32px; background:#f0f2ff; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; }
+        .card-body { padding:1.25rem; }
+
+        /* Form elements */
+        .field { margin-bottom:1rem; }
+        .field:last-child { margin-bottom:0; }
+        .field label { display:block; font-size:0.78rem; font-weight:700; color:#374151; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.35rem; }
+        .field input, .field select { width:100%; padding:0.65rem 0.875rem; border:1.5px solid #e0e3ff; border-radius:8px; font-size:0.9rem; background:#fafafa; transition:all 0.2s; }
+        .field input:focus, .field select:focus { outline:none; border-color:#667eea; background:white; box-shadow:0 0 0 3px rgba(102,126,234,0.12); }
+        .field small { display:block; margin-top:0.25rem; font-size:0.72rem; color:#9ca3af; }
+
+        /* Toggle switch */
+        .toggle-row { display:flex; justify-content:space-between; align-items:center; padding:0.65rem 0; border-bottom:1px solid #f0f2ff; }
+        .toggle-row:last-child { border-bottom:none; }
+        .toggle-label { font-size:0.875rem; color:#374151; font-weight:500; }
+        .toggle-sub { font-size:0.72rem; color:#9ca3af; }
+        .switch { position:relative; display:inline-block; width:44px; height:24px; flex-shrink:0; }
+        .switch input { opacity:0; width:0; height:0; }
+        .slider { position:absolute; cursor:pointer; inset:0; background:#d1d5db; border-radius:24px; transition:0.3s; }
+        .slider:before { position:absolute; content:""; height:18px; width:18px; left:3px; bottom:3px; background:white; border-radius:50%; transition:0.3s; box-shadow:0 1px 3px rgba(0,0,0,0.2); }
+        input:checked + .slider { background:#667eea; }
+        input:checked + .slider:before { transform:translateX(20px); }
+
+        /* Type tabs */
+        .type-tabs { display:grid; grid-template-columns:repeat(4,1fr); gap:0.4rem; margin-bottom:1.25rem; }
+        .type-tab { padding:0.6rem 0.25rem; border:2px solid #e0e3ff; border-radius:8px; text-align:center; cursor:pointer; transition:all 0.2s; font-size:0.8rem; font-weight:600; color:#6b7280; background:white; }
+        .type-tab:hover { border-color:#c7d2fe; color:#4338ca; }
+        .type-tab.active { border-color:#667eea; background:#667eea; color:white; }
+        .type-tab .tab-icon { font-size:1.2rem; display:block; margin-bottom:2px; }
+
+        /* Section panes */
+        .config-pane { display:none; }
+        .config-pane.active { display:block; }
+
+        /* Buttons */
+        .btn { padding:0.7rem 1.25rem; border:none; border-radius:8px; font-size:0.9rem; font-weight:600; cursor:pointer; transition:all 0.2s; display:inline-flex; align-items:center; gap:0.5rem; }
+        .btn-primary { background:linear-gradient(135deg,#667eea,#764ba2); color:white; }
+        .btn-primary:hover { opacity:0.9; transform:translateY(-1px); box-shadow:0 4px 12px rgba(102,126,234,0.35); }
+        .btn-secondary { background:#f0f2ff; color:#4338ca; border:1.5px solid #e0e3ff; }
+        .btn-secondary:hover { background:#e0e3ff; }
+        .btn-danger { background:#fef2f2; color:#dc2626; border:1.5px solid #fecaca; }
+        .btn-danger:hover { background:#fee2e2; }
+        .btn-sm { padding:0.45rem 0.875rem; font-size:0.8rem; }
+        .btn-row { display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:1rem; }
+        .btn:disabled { opacity:0.5; cursor:not-allowed; transform:none !important; }
+
+        /* Status badge */
+        .status-badge { display:inline-flex; align-items:center; gap:0.35rem; padding:0.3rem 0.7rem; border-radius:20px; font-size:0.75rem; font-weight:600; }
+        .status-ok { background:#d1fae5; color:#065f46; }
+        .status-err { background:#fee2e2; color:#991b1b; }
+        .status-idle { background:#f3f4f6; color:#6b7280; }
+        .status-dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
+
+        /* Alert */
+        .alert { padding:0.875rem 1rem; border-radius:8px; font-size:0.85rem; margin-bottom:1rem; }
+        .alert-info { background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; }
+        .alert-success { background:#d1fae5; border:1px solid #a7f3d0; color:#065f46; }
+        .alert-danger { background:#fee2e2; border:1px solid #fecaca; color:#991b1b; }
+
+        /* Test area */
+        .test-log { background:#1e1e2e; color:#a6e3a1; border-radius:8px; padding:1rem; font-family:'Courier New',monospace; font-size:0.78rem; min-height:80px; max-height:160px; overflow-y:auto; white-space:pre-wrap; margin-top:0.75rem; }
+
+        /* Divider */
+        hr { border:none; border-top:1.5px solid #f0f2ff; margin:1rem 0; }
+
+        /* Printer card full-width */
+        .full-width { grid-column:1/-1; }
+
+        /* Quick guide */
+        .guide-item { display:flex; gap:0.75rem; padding:0.6rem 0; border-bottom:1px solid #f0f2ff; align-items:flex-start; }
+        .guide-item:last-child { border-bottom:none; }
+        .guide-num { width:22px; height:22px; background:#667eea; color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:700; flex-shrink:0; }
+        .guide-text { font-size:0.82rem; color:#374151; line-height:1.5; }
+        .guide-text strong { color:#4338ca; }
+    </style>
+</head>
+<body>
+
+<div class="page-header">
+    <a href="{{ url_for('pos') }}">&#8592; Back to POS</a>
+    <span style="opacity:0.4;">|</span>
+    <h1>🖨 Thermal Printer Settings</h1>
+    <span style="margin-left:auto;" id="conn-status">
+        <span class="status-badge status-idle"><span class="status-dot"></span> Not tested</span>
+    </span>
+</div>
+
+<div class="page-body">
+
+    <!-- CONNECTION TYPE -->
+    <div class="card full-width">
+        <div class="card-header">
+            <div class="icon">🔌</div>
+            <h2>Connection Type</h2>
+            <small style="margin-left:auto; color:#9ca3af; font-size:0.78rem;">How is your printer connected?</small>
+        </div>
+        <div class="card-body">
+            <div class="type-tabs">
+                <div class="type-tab active" data-type="network" onclick="switchType('network')">
+                    <span class="tab-icon">🌐</span>Network / LAN
+                </div>
+                <div class="type-tab" data-type="usb" onclick="switchType('usb')">
+                    <span class="tab-icon">🔌</span>USB Direct
+                </div>
+                <div class="type-tab" data-type="serial" onclick="switchType('serial')">
+                    <span class="tab-icon">📡</span>Serial / COM
+                </div>
+                <div class="type-tab" data-type="windows" onclick="switchType('windows')">
+                    <span class="tab-icon">🪟</span>Windows Print
+                </div>
+            </div>
+
+            <!-- Network pane -->
+            <div class="config-pane active" id="pane-network">
+                <div class="alert alert-info">&#8505; Most common setup. Connect your printer to the same Wi-Fi or LAN switch as this PC. Check the printer's IP from its settings menu.</div>
+                <div style="display:grid; grid-template-columns:2fr 1fr; gap:0.75rem;">
+                    <div class="field">
+                        <label>Printer IP Address</label>
+                        <input type="text" id="net-host" placeholder="192.168.1.100" value="192.168.1.100">
+                        <small>Print the "Self-Test" page on your printer to find its IP</small>
+                    </div>
+                    <div class="field">
+                        <label>Port</label>
+                        <input type="number" id="net-port" placeholder="9100" value="9100">
+                        <small>Default: 9100</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- USB pane -->
+            <div class="config-pane" id="pane-usb">
+                <div class="alert alert-info">&#8505; Direct USB (raw ESC/POS). Requires the printer's Vendor ID and Product ID from Windows Device Manager.</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                    <div class="field">
+                        <label>Vendor ID (VID)</label>
+                        <input type="text" id="usb-vendor" placeholder="0x04b8" value="0x04b8">
+                        <small>Epson: 0x04b8 | Star: 0x0519 | Bixolon: 0x1504</small>
+                    </div>
+                    <div class="field">
+                        <label>Product ID (PID)</label>
+                        <input type="text" id="usb-product" placeholder="0x0202" value="0x0202">
+                        <small>Found in Device Manager → Printer Properties → Details</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Serial pane -->
+            <div class="config-pane" id="pane-serial">
+                <div class="alert alert-info">&#8505; For older printers connected via RS-232 cable. Check Device Manager for the COM port number.</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                    <div class="field">
+                        <label>COM Port</label>
+                        <input type="text" id="serial-port" placeholder="COM3" value="COM3">
+                        <small>Windows: COM1–COM9 | Linux: /dev/ttyUSB0</small>
+                    </div>
+                    <div class="field">
+                        <label>Baud Rate</label>
+                        <select id="serial-baud">
+                            <option value="9600">9600 (default)</option>
+                            <option value="19200">19200</option>
+                            <option value="38400">38400</option>
+                            <option value="115200">115200</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Windows pane -->
+            <div class="config-pane" id="pane-windows">
+                <div class="alert alert-info">&#8505; Uses the Windows print spooler. Easiest to set up — just share the printer in Windows Settings and enter its exact name.</div>
+                <div class="field">
+                    <label>Windows Printer Name</label>
+                    <input type="text" id="win-printer" placeholder="EPSON TM-T82X Receipt">
+                    <small>Must match exactly what appears in Control Panel → Devices and Printers</small>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="discoverPrinters()">🔍 Auto-detect Windows Printers</button>
+                <div id="discovered-list" style="margin-top:0.75rem;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAPER & HARDWARE -->
+    <div class="card">
+        <div class="card-header">
+            <div class="icon">📄</div>
+            <h2>Paper & Hardware</h2>
+        </div>
+        <div class="card-body">
+            <div class="field">
+                <label>Paper Width</label>
+                <select id="paper-width">
+                    <option value="80" selected>80mm — Standard (recommended)</option>
+                    <option value="58">58mm — Narrow</option>
+                </select>
+                <small>Check the paper roll currently loaded in your printer</small>
+            </div>
+            <hr>
+            <div class="toggle-row">
+                <div>
+                    <div class="toggle-label">Cash Drawer Kick</div>
+                    <div class="toggle-sub">Automatically open drawer after every cash sale</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="cash-drawer" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="toggle-row">
+                <div>
+                    <div class="toggle-label">Auto-Cut Paper</div>
+                    <div class="toggle-sub">Full cut after each receipt (requires cutter unit)</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="cut-paper" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="toggle-row">
+                <div>
+                    <div class="toggle-label">Auto-Print on Sale</div>
+                    <div class="toggle-sub">Print receipt immediately when checkout completes</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="auto-print" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- TEST & SAVE -->
+    <div class="card">
+        <div class="card-header">
+            <div class="icon">🧪</div>
+            <h2>Test & Save</h2>
+        </div>
+        <div class="card-body">
+            <p style="font-size:0.85rem; color:#6b7280; margin-bottom:1rem;">Always test before going live. A test receipt will print with sample data.</p>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="saveConfig()">💾 Save Settings</button>
+                <button class="btn btn-secondary" onclick="testPrint()">🖨 Test Print</button>
+                <button class="btn btn-secondary" onclick="testDrawer()">💵 Test Drawer</button>
+            </div>
+            <div class="test-log" id="test-log">Ready. Press "Test Print" to verify connection...\n</div>
+        </div>
+    </div>
+
+    <!-- QUICK SETUP GUIDE -->
+    <div class="card full-width">
+        <div class="card-header">
+            <div class="icon">📘</div>
+            <h2>Quick Setup Guide</h2>
+        </div>
+        <div class="card-body">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 2rem;">
+                <div>
+                    <p style="font-size:0.8rem; font-weight:700; color:#667eea; margin-bottom:0.5rem;">NETWORK PRINTER (Recommended)</p>
+                    <div class="guide-item"><div class="guide-num">1</div><div class="guide-text">Connect printer to router via LAN cable or Wi-Fi</div></div>
+                    <div class="guide-item"><div class="guide-num">2</div><div class="guide-text">On the printer: hold <strong>FEED</strong> button while powering on → prints IP address</div></div>
+                    <div class="guide-item"><div class="guide-num">3</div><div class="guide-text">Enter that IP here, keep port <strong>9100</strong></div></div>
+                    <div class="guide-item"><div class="guide-num">4</div><div class="guide-text">Click <strong>Save Settings</strong> then <strong>Test Print</strong></div></div>
+                </div>
+                <div>
+                    <p style="font-size:0.8rem; font-weight:700; color:#667eea; margin-bottom:0.5rem;">CASH DRAWER WIRING</p>
+                    <div class="guide-item"><div class="guide-num">1</div><div class="guide-text">Cash drawer connects to the printer's RJ-12 port (not to the PC)</div></div>
+                    <div class="guide-item"><div class="guide-num">2</div><div class="guide-text">Enable "Cash Drawer Kick" toggle above</div></div>
+                    <div class="guide-item"><div class="guide-num">3</div><div class="guide-text">Drawer opens automatically on every cash sale</div></div>
+                    <div class="guide-item"><div class="guide-num">4</div><div class="guide-text">Manual open: press <strong>Open Drawer</strong> button on receipt screen</div></div>
+                </div>
+            </div>
+            <hr>
+            <p style="font-size:0.78rem; color:#9ca3af;">Compatible printers: <strong>Epson TM-T82X, TM-T88</strong> · <strong>Star TSP100, TSP650</strong> · <strong>Bixolon SRP-350</strong> · any 80mm ESC/POS printer</p>
+        </div>
+    </div>
+
+</div><!-- end page-body -->
+
+<script>
+    let currentType = 'network';
+    let cfg = {};
+
+    // Load config on page load
+    async function loadConfig() {
+        try {
+            const r = await fetch('/api/printer-config');
+            cfg = await r.json();
+            applyConfig(cfg);
+        } catch(e) {
+            log('Could not load config: ' + e);
+        }
+    }
+
+    function applyConfig(c) {
+        currentType = c.type || 'network';
+        switchType(currentType);
+
+        // Network
+        if (c.host)           document.getElementById('net-host').value   = c.host;
+        if (c.port)           document.getElementById('net-port').value   = c.port;
+        // USB
+        if (c.usb_vendor)     document.getElementById('usb-vendor').value  = c.usb_vendor;
+        if (c.usb_product)    document.getElementById('usb-product').value = c.usb_product;
+        // Serial
+        if (c.serial_port)    document.getElementById('serial-port').value = c.serial_port;
+        if (c.baudrate)       document.getElementById('serial-baud').value  = c.baudrate;
+        // Windows
+        if (c.windows_printer) document.getElementById('win-printer').value = c.windows_printer;
+        // Paper
+        if (c.paper_width)    document.getElementById('paper-width').value = c.paper_width;
+        // Toggles
+        document.getElementById('cash-drawer').checked = c.cash_drawer !== false;
+        document.getElementById('cut-paper').checked   = c.cut_paper   !== false;
+        document.getElementById('auto-print').checked  = c.auto_print  !== false;
+    }
+
+    function buildConfig() {
+        return {
+            type:            currentType,
+            host:            document.getElementById('net-host').value.trim(),
+            port:            parseInt(document.getElementById('net-port').value) || 9100,
+            usb_vendor:      document.getElementById('usb-vendor').value.trim(),
+            usb_product:     document.getElementById('usb-product').value.trim(),
+            serial_port:     document.getElementById('serial-port').value.trim(),
+            baudrate:        parseInt(document.getElementById('serial-baud').value) || 9600,
+            windows_printer: document.getElementById('win-printer').value.trim(),
+            paper_width:     parseInt(document.getElementById('paper-width').value) || 80,
+            cash_drawer:     document.getElementById('cash-drawer').checked,
+            cut_paper:       document.getElementById('cut-paper').checked,
+            auto_print:      document.getElementById('auto-print').checked,
+        };
+    }
+
+    function switchType(type) {
+        currentType = type;
+        document.querySelectorAll('.type-tab').forEach(t => t.classList.toggle('active', t.dataset.type === type));
+        document.querySelectorAll('.config-pane').forEach(p => p.classList.remove('active'));
+        const pane = document.getElementById('pane-' + type);
+        if (pane) pane.classList.add('active');
+    }
+
+    async function saveConfig() {
+        const c = buildConfig();
+        try {
+            const r = await fetch('/api/printer-config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(c)
+            });
+            const res = await r.json();
+            if (res.success) {
+                log('✓ Settings saved successfully!');
+                setStatus('ok', 'Settings saved');
+            } else {
+                log('✗ Save failed: ' + JSON.stringify(res));
+            }
+        } catch(e) { log('Error: ' + e); }
+    }
+
+    async function testPrint() {
+        log('Sending test receipt to printer...');
+        setStatus('idle', 'Testing...');
+        try {
+            const r = await fetch('/api/test-print', { method: 'POST' });
+            const res = await r.json();
+            if (res.success) {
+                log('✓ Test print sent! Check your printer.\n  ' + res.message);
+                setStatus('ok', 'Connected');
+            } else {
+                log('✗ Print failed:\n  ' + (res.error || res.message));
+                setStatus('err', 'Error');
+            }
+        } catch(e) { log('Error: ' + e); setStatus('err', 'Error'); }
+    }
+
+    async function testDrawer() {
+        log('Sending cash drawer open signal...');
+        try {
+            const r = await fetch('/api/open-drawer', { method: 'POST' });
+            const res = await r.json();
+            log(res.success ? '✓ Cash drawer signal sent!' : '✗ ' + (res.message || res.error));
+        } catch(e) { log('Error: ' + e); }
+    }
+
+    async function discoverPrinters() {
+        log('Scanning for printers...');
+        try {
+            const r = await fetch('/api/discover-printers');
+            const res = await r.json();
+            const list = document.getElementById('discovered-list');
+            if (!res.printers || res.printers.length === 0) {
+                list.innerHTML = '<p style="font-size:0.82rem;color:#9ca3af;margin-top:0.5rem;">No printers auto-detected. Enter name manually.</p>';
+                log('No printers found via auto-detect.');
+                return;
+            }
+            list.innerHTML = res.printers.map(p => `
+                <div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0;border-bottom:1px solid #f0f2ff;">
+                    <span style="font-size:0.82rem;color:#374151;flex:1;">${p.description}</span>
+                    <button class="btn btn-secondary btn-sm" onclick="selectPrinter(${JSON.stringify(p).replace(/"/g,'&quot;')})">Use This</button>
+                </div>`).join('');
+            log(`Found ${res.printers.length} printer(s).`);
+        } catch(e) { log('Discover error: ' + e); }
+    }
+
+    function selectPrinter(p) {
+        if (p.type === 'windows') {
+            document.getElementById('win-printer').value = p.name;
+        } else if (p.type === 'usb') {
+            document.getElementById('usb-vendor').value  = p.vendor  || '';
+            document.getElementById('usb-product').value = p.product || '';
+            switchType('usb');
+        } else if (p.type === 'serial') {
+            document.getElementById('serial-port').value = p.name;
+            switchType('serial');
+        }
+        log(`Selected: ${p.description}`);
+    }
+
+    function log(msg) {
+        const el = document.getElementById('test-log');
+        const now = new Date().toLocaleTimeString('en-PH');
+        el.textContent += `[${now}] ${msg}\n`;
+        el.scrollTop = el.scrollHeight;
+    }
+
+    function setStatus(state, text) {
+        const el = document.getElementById('conn-status');
+        const cls = state === 'ok' ? 'status-ok' : state === 'err' ? 'status-err' : 'status-idle';
+        el.innerHTML = `<span class="status-badge ${cls}"><span class="status-dot"></span>${text}</span>`;
+    }
+
+    loadConfig();
+</script>
+</body>
+</html>
