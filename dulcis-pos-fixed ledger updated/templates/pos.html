@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base target="_self">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS - Dulcis & Café</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pos.css') }}">
+    <script src="{{ url_for('static', filename='js/timezone.js') }}"></script>
+    <style>
+        /* Quick Actions Bar */
+        .quick-actions {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.75rem 1.5rem;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .btn-quick {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        
+        .btn-void {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1.5px solid #fecaca;
+        }
+        
+        .btn-void:hover {
+            background: #dc2626;
+            color: white;
+            border-color: #dc2626;
+        }
+        
+        .btn-history {
+            background: #eff6ff;
+            color: #2563eb;
+            border: 1.5px solid #bfdbfe;
+        }
+        
+        .btn-history:hover {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+
+        .btn-printer {
+            background: #f5f3ff;
+            color: #7c3aed;
+            border: 1.5px solid #ddd6fe;
+        }
+
+        .btn-printer:hover {
+            background: #7c3aed;
+            color: white;
+            border-color: #7c3aed;
+        }
+        
+        /* ── Compact Cart Summary ── */
+        .cart-summary-compact {
+            padding: 0.85rem 1.25rem;
+            border-top: 1px solid #e5e7eb;
+            background: #f5f6ff;
+        }
+        .summary-row-compact {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.35rem;
+            font-size: 0.85rem;
+            color: #6b7280;
+        }
+        .summary-row-compact.total {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #1f2937;
+            border-top: 1px solid #ddd;
+            padding-top: 0.45rem;
+            margin-top: 0.45rem;
+        }
+        .summary-row-compact.total span:last-child { color: #667eea; }
+
+        /* ── Payment Section ── */
+        .payment-section {
+            padding: 0.85rem 1.25rem 1.25rem;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        /* Customer Name */
+        .customer-input-group { margin-bottom: 0.75rem; }
+        .customer-input-group label {
+            display: flex; align-items: center; gap: 0.35rem;
+            font-size: 0.78rem; font-weight: 700; color: #374151;
+            text-transform: uppercase; letter-spacing: 0.05em;
+            margin-bottom: 0.35rem;
+        }
+        .customer-input-group input {
+            width: 100%; padding: 0.6rem 0.875rem;
+            border: 1.5px solid #e5e7eb; border-radius: 8px;
+            font-size: 0.9rem; transition: all 0.2s; background: #fafafa;
+        }
+        .customer-input-group input:focus {
+            outline: none; border-color: #667eea; background: white;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.12);
+        }
+
+        /* Payment method tabs */
+        .payment-methods { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+        .payment-option { flex: 1; cursor: pointer; }
+        .payment-option input { display: none; }
+        .payment-option span {
+            display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+            padding: 0.6rem; text-align: center;
+            border: 2px solid #e5e7eb; border-radius: 8px;
+            font-size: 0.85rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; color: #6b7280;
+        }
+        .payment-option input:checked + span {
+            border-color: #667eea; background: #667eea; color: white;
+            box-shadow: 0 2px 8px rgba(102,126,234,0.3);
+        }
+
+        /* Cash Calculator */
+        .cash-calculator {
+            background: #f5f6ff; border: 1.5px solid #e0e3ff;
+            border-radius: 8px; padding: 0.75rem; margin-bottom: 0.75rem;
+        }
+        .cash-calculator label {
+            display: block; margin-bottom: 0.35rem;
+            font-size: 0.78rem; font-weight: 700; color: #374151;
+            text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .cash-calculator input {
+            width: 100%; padding: 0.65rem 0.875rem;
+            border: 1.5px solid #c7d2fe; border-radius: 6px;
+            font-size: 1rem; margin-bottom: 0.6rem; background: white;
+            transition: border-color 0.2s;
+        }
+        .cash-calculator input:focus {
+            outline: none; border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.12);
+        }
+        .change-display {
+            display: flex; justify-content: space-between;
+            font-weight: 700; color: #1f2937; font-size: 0.95rem;
+            background: white; border-radius: 6px; padding: 0.5rem 0.75rem;
+            border: 1px solid #e0e3ff;
+        }
+        .change-display span:last-child { color: #667eea; }
+
+        /* Digital Payment Fields */
+        .digital-payment-fields {
+            display: none; background: #f5f6ff;
+            border: 1.5px solid #c7d2fe; border-radius: 8px;
+            padding: 0.85rem; margin-bottom: 0.75rem;
+        }
+        .digital-payment-fields.active { display: block; }
+        .digital-payment-fields h4 {
+            margin: 0 0 0.65rem 0; font-size: 0.85rem;
+            color: #4338ca; display: flex; align-items: center; gap: 0.4rem;
+            font-weight: 700;
+        }
+        .digital-field { margin-bottom: 0.65rem; }
+        .digital-field:last-child { margin-bottom: 0; }
+        .digital-field label {
+            display: block; margin-bottom: 0.3rem;
+            font-size: 0.78rem; font-weight: 700; color: #374151;
+            text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .digital-field label span { color: #dc2626; }
+        .digital-field input {
+            width: 100%; padding: 0.6rem 0.875rem;
+            border: 1.5px solid #c7d2fe; border-radius: 6px;
+            font-size: 0.9rem; background: white; transition: all 0.2s;
+        }
+        .digital-field input:focus {
+            outline: none; border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.12);
+        }
+        .digital-field small {
+            display: block; margin-top: 0.2rem;
+            font-size: 0.72rem; color: #6b7280;
+        }
+
+        /* Checkout Button */
+        .btn-checkout {
+            width: 100%; padding: 0.95rem;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white; border: none; border-radius: 8px;
+            font-size: 1.05rem; font-weight: 700; cursor: pointer;
+            transition: all 0.2s; letter-spacing: 0.3px;
+        }
+        .btn-checkout:hover:not(:disabled) {
+            opacity: 0.92; transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(102,126,234,0.4);
+        }
+        .btn-checkout:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        /* ── Receipt Modal Overlay ── */
+        .receipt-modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(30,27,75,0.55); backdrop-filter: blur(3px);
+            z-index: 1000; justify-content: center; align-items: center;
+        }
+        .receipt-modal-overlay.open { display: flex; }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <div class="pos-container">
+        <header class="pos-header">
+            <div class="brand">
+                <h1>Dulcis & Café</h1>
+                <span class="role-badge">{{ session.role }}</span>
+            </div>
+            <div class="header-actions">
+                {% if session.role == 'admin' %}
+                <a href="{{ url_for('admin_dashboard') }}" class="btn btn-primary">Admin Panel</a>
+                {% elif session.role == 'manager' %}
+                <a href="{{ url_for('manager_dashboard') }}" class="btn btn-primary">Manager Dashboard</a>
+                {% endif %}
+                <a href="{{ url_for('logout') }}" class="btn btn-danger" target="_self">Logout</a>
+            </div>
+        </header>
+
+        <!-- Quick Actions Bar -->
+        <div class="quick-actions">
+            {% if session.role in ['admin', 'manager'] %}
+            <a href="{{ url_for('cancel_orders_page') }}" class="btn-quick btn-void" target="_self">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="15" y1="9" x2="9" y2="15"></line>
+                    <line x1="9" y1="9" x2="15" y2="15"></line>
+                </svg>
+                Cancel/Void Order
+            </a>
+            <a href="{{ url_for('admin_sales') }}" class="btn-quick btn-history" target="_self">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                Order History
+            </a>
+            {% endif %}
+            <a href="{{ url_for('printer_settings') }}" class="btn-quick btn-printer" target="_self">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                Printer Setup
+            </a>
+        </div>
+
+        <div class="pos-main">
+            <div class="products-section">
+                <div class="search-bar">
+                    <input type="text" id="search-input" placeholder="Search products..." autocomplete="off">
+                    <select id="category-filter">
+                        <option value="">All Categories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="products-grid" id="products-grid">
+                    {% for product in products %}
+                    <div class="product-card" data-id="{{ product.id }}" data-stock="{{ product.stock }}">
+                        <div class="product-image">
+                            {% if product.image %}
+                            <img src="{{ url_for('static', filename='images/products/' + product.image) }}" alt="{{ product.name }}">
+                            {% else %}
+                            <div class="no-image">No Image</div>
+                            {% endif %}
+                        </div>
+                        <div class="product-info">
+                            <h3>{{ product.name }}</h3>
+                            <p class="category">{{ product.category_name or 'Uncategorized' }}</p>
+                            <p class="price">₱{{ "%.2f"|format(product.price) }}</p>
+                            <p class="stock {% if product.stock <= product.min_stock_level %}low{% endif %}">
+                                Stock: {{ product.stock }}
+                            </p>
+                        </div>
+                        <button class="btn btn-primary add-to-cart" onclick="addToCart({{ product.id }}, '{{ product.name }}', {{ product.price }}, {{ product.stock }})">
+                            Add Order
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="cart-section">
+                <div class="cart-header">
+                    <h2>Current Order</h2>
+                    <button class="btn" onclick="clearCart()" style="background:#e0e0e0;">Clear</button>
+                </div>
+                
+                <div class="cart-items" id="cart-items">
+                    <div class="empty-cart">
+                        <p>No items added yet</p>
+                    </div>
+                </div>
+                
+                <!-- Compact Summary — VAT-inclusive pricing (PH standard) -->
+                <div class="cart-summary-compact">
+                    <div class="summary-row-compact">
+                        <span>Amount:</span>
+                        <span id="subtotal">₱0.00</span>
+                    </div>
+                    <div class="summary-row-compact">
+                        <span style="font-size:0.78rem;">VAT 12% (incl.):</span>
+                        <span id="tax">₱0.00</span>
+                    </div>
+                    <div class="summary-row-compact total">
+                        <span>Total Due:</span>
+                        <span id="total">₱0.00</span>
+                    </div>
+                </div>
+                
+                <div class="payment-section">
+                    <!-- Customer Name -->
+                    <div class="customer-input-group">
+                        <label>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            Customer Name
+                        </label>
+                        <input type="text" id="customer-name" placeholder="Walk-in Customer (optional)" autocomplete="name">
+                    </div>
+
+                    <!-- Payment Method Tabs -->
+                    <div class="payment-methods">
+                        <label class="payment-option" onclick="showCash()">
+                            <input type="radio" name="payment" value="cash" checked>
+                            <span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                                Cash
+                            </span>
+                        </label>
+                        <label class="payment-option" onclick="showDigital()">
+                            <input type="radio" name="payment" value="digital">
+                            <span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                                Digital Pay
+                            </span>
+                        </label>
+                    </div>
+
+                    <!-- Cash Fields -->
+                    <div class="cash-calculator" id="cash-calculator">
+                        <label>Amount Received (&#8369;)</label>
+                        <input type="number" id="amount-received" step="0.01" placeholder="0.00" min="0">
+                        <div class="change-display">
+                            <span>Change Due</span>
+                            <span id="change-amount">&#8369;0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Digital Payment Fields -->
+                    <div class="digital-payment-fields" id="digital-payment-fields">
+                        <h4>
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            Digital Payment Details
+                        </h4>
+                        <div class="digital-field">
+                            <label>Reference Number <span>*</span></label>
+                            <input type="text" id="digital-reference" placeholder="e.g. GCash Ref #1234567890">
+                            <small>Transaction ID from GCash, Maya, etc.</small>
+                        </div>
+                        <div class="digital-field">
+                            <label>Amount Paid (&#8369;) <span>*</span></label>
+                            <input type="number" id="digital-amount-paid" step="0.01" placeholder="0.00" min="0">
+                            <small>Exact amount sent by the customer</small>
+                        </div>
+                    </div>
+
+                    <button class="btn-checkout" onclick="processCheckout()" id="checkout-btn" disabled>
+                        ✓  Complete Sale
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receipt Modal -->
+    <div class="modal" id="receipt-modal" style="z-index:1050;">
+        <div style="position:relative; width:100%; max-width:360px; margin:auto;">
+
+            <!-- ✕ Exit button -->
+            <button onclick="closeReceipt()" title="Close" style="
+                position:absolute; top:-16px; right:-16px; z-index:20;
+                width:34px; height:34px; border-radius:50%;
+                background:#fff; border:2px solid #667eea; color:#667eea;
+                font-size:1rem; font-weight:900; cursor:pointer;
+                display:flex; align-items:center; justify-content:center;
+                box-shadow:0 2px 10px rgba(102,126,234,0.3); line-height:1;
+            ">&#10005;</button>
+
+            <!-- Receipt Paper -->
+            <div id="receipt-paper" style="
+                background:#fff;
+                font-family:'Courier New', Courier, monospace;
+                width:100%;
+                border-radius:10px 10px 0 0;
+                box-shadow:0 12px 40px rgba(30,27,75,0.22);
+                overflow:hidden;
+            ">
+                <!-- Header -->
+                <div style="background:linear-gradient(135deg,#667eea,#764ba2); padding:1.1rem 1rem 0.9rem; text-align:center; color:white;">
+                    <div style="font-size:1.35rem; font-weight:900; letter-spacing:3px; text-transform:uppercase; text-shadow:0 1px 4px rgba(0,0,0,0.2);">Dulcis &amp; Caf&#233;</div>
+                    <div style="font-size:0.58rem; letter-spacing:2px; opacity:0.8; margin-top:4px; font-weight:600;">&#9679;&nbsp; OFFICIAL RECEIPT &nbsp;&#9679;</div>
+                </div>
+
+                <!-- Store info -->
+                <div style="background:#4338ca; color:#c7d2fe; text-align:center; padding:0.28rem 0.5rem; font-size:0.57rem; letter-spacing:0.5px;">
+                    Talisay, Cebu &nbsp;|&nbsp; VAT Reg. TIN: 000-000-000-00000
+                </div>
+
+                <!-- Body -->
+                <div style="padding:0.7rem 1rem 0.2rem;">
+
+                    <!-- Date / Time -->
+                    <div style="display:flex; justify-content:space-between; font-size:0.6rem; color:#9ca3af; margin-bottom:0.1rem;">
+                        <span id="receipt-date-left"></span>
+                        <span id="receipt-time-right"></span>
+                    </div>
+                    <!-- TXN / Cashier -->
+                    <div style="display:flex; justify-content:space-between; font-size:0.6rem; color:#9ca3af; margin-bottom:0.5rem;">
+                        <span>TXN: <strong id="receipt-txn-id" style="color:#4b5563;"></strong></span>
+                        <span>Cashier: <strong id="receipt-cashier" style="color:#4b5563;"></strong></span>
+                    </div>
+
+                    <div style="border-top:1px dashed #e5e7eb; margin-bottom:0.5rem;"></div>
+
+                    <!-- Customer + Payment badge in one row -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.55rem;">
+                        <div style="font-size:0.65rem; color:#6b7280;">
+                            <span>Customer:&nbsp;</span>
+                            <strong id="receipt-customer-name" style="color:#374151;"></strong>
+                        </div>
+                        <span id="r-payment-badge" style="
+                            background:#ede9fe; border:1px solid #c4b5fd;
+                            border-radius:20px; padding:2px 10px;
+                            font-size:0.58rem; font-weight:700; color:#5b21b6; letter-spacing:0.5px;
+                        "></span>
+                    </div>
+
+                    <!-- Items header -->
+                    <div style="display:flex; justify-content:space-between; font-size:0.58rem; font-weight:700; color:#667eea; letter-spacing:0.8px; border-top:1.5px solid #667eea; border-bottom:1.5px solid #667eea; padding:0.28rem 0; margin-bottom:0.4rem;">
+                        <span>ITEM &amp; QTY</span>
+                        <span>AMOUNT</span>
+                    </div>
+
+                    <!-- Items list -->
+                    <div id="receipt-items-thermal" style="margin-bottom:0.5rem; min-height:20px;"></div>
+
+                    <!-- VAT breakdown -->
+                    <div style="border-top:1px dashed #e0e3ff; padding-top:0.45rem; margin-bottom:0.45rem;">
+                        <div style="display:flex; justify-content:space-between; font-size:0.67rem; color:#4b5563; margin-bottom:0.15rem; font-weight:600;">
+                            <span>VATable Sales (Net)</span><span id="r-subtotal"></span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.6rem; color:#9ca3af; margin-bottom:0.1rem;">
+                            <span>Add: VAT 12%</span><span id="r-vat"></span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.6rem; color:#9ca3af; margin-bottom:0.1rem;">
+                            <span>VAT-Exempt Sale</span><span>&#8369;0.00</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.6rem; color:#9ca3af; margin-bottom:0.1rem;">
+                            <span>Zero-Rated Sale</span><span>&#8369;0.00</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.6rem; color:#9ca3af;">
+                            <span>Discount</span><span>&#8369;0.00</span>
+                        </div>
+                    </div>
+
+                    <!-- Total Due -->
+                    <div style="background:linear-gradient(135deg,#667eea,#764ba2); color:white; border-radius:8px; padding:0.55rem 0.8rem; display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; box-shadow:0 3px 10px rgba(102,126,234,0.35);">
+                        <span style="font-size:0.78rem; font-weight:900; letter-spacing:1.5px;">TOTAL DUE</span>
+                        <span id="r-total" style="font-size:1.2rem; font-weight:900;"></span>
+                    </div>
+
+                    <!-- Payment breakdown -->
+                    <div style="border:1.5px solid #e0e3ff; border-radius:8px; padding:0.5rem 0.7rem; margin-bottom:0.5rem; font-size:0.65rem; background:#f8f7ff;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:0.15rem;">
+                            <span style="color:#9ca3af;">Payment Method</span>
+                            <strong id="r-payment-method" style="color:#4338ca;"></strong>
+                        </div>
+                        <div id="r-cash-row" style="display:flex; justify-content:space-between; margin-bottom:0.1rem;">
+                            <span style="color:#9ca3af;">Cash Tendered</span>
+                            <strong id="r-cash-tendered" style="color:#374151;"></strong>
+                        </div>
+                        <div id="r-change-row" style="display:flex; justify-content:space-between;">
+                            <span style="color:#9ca3af;">Change Due</span>
+                            <strong id="r-change" style="color:#667eea;"></strong>
+                        </div>
+                        <div id="r-ref-row" style="display:none; justify-content:space-between;">
+                            <span style="color:#9ca3af;">Reference No.</span>
+                            <strong id="r-ref-num" style="color:#374151; font-size:0.6rem;"></strong>
+                        </div>
+                    </div>
+
+                    <!-- BIR footer -->
+                    <div style="font-size:0.56rem; color:#d1d5db; text-align:center; border-top:1px dashed #e5e7eb; padding-top:0.4rem; margin-bottom:0.4rem; line-height:2;">
+                        <div>VATable Sales (Net): <span id="r-vatable" style="color:#9ca3af; font-weight:600;"></span></div>
+                        <div>VAT Amount (12%): <span id="r-vat-amount" style="color:#9ca3af; font-weight:600;"></span></div>
+                        <div style="opacity:0.7;">Prices are VAT-inclusive per NIRC Sec. 106</div>
+                    </div>
+
+                    <!-- Thank you -->
+                    <div style="text-align:center; margin-bottom:0.5rem;">
+                        <div style="font-size:0.78rem; font-weight:800; color:#667eea; letter-spacing:0.5px;">SALAMAT! BALIK-BALIK PO!</div>
+                        <div style="font-size:0.56rem; color:#d1d5db; margin-top:3px;">This serves as your official receipt.</div>
+                        <div style="font-size:0.56rem; color:#d1d5db;">Goods sold are non-returnable.</div>
+                    </div>
+
+                    <!-- TXN barcode strip -->
+                    <div style="text-align:center; padding-bottom:0.6rem;">
+                        <div id="receipt-barcode-text" style="font-family:'Courier New',monospace; font-size:0.52rem; letter-spacing:3px; color:#d1d5db;"></div>
+                    </div>
+                </div>
+
+                <!-- Zigzag tear edge -->
+                <div style="overflow:hidden; line-height:0;">
+                    <svg viewBox="0 0 360 16" xmlns="http://www.w3.org/2000/svg" style="display:block; width:100%;">
+                        <path d="M0,0 L18,16 L36,0 L54,16 L72,0 L90,16 L108,0 L126,16 L144,0 L162,16 L180,0 L198,16 L216,0 L234,16 L252,0 L270,16 L288,0 L306,16 L324,0 L342,16 L360,0 L360,16 L0,16 Z" fill="#fff"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div style="display:flex; gap:0.5rem; padding:0.7rem 0.8rem; background:linear-gradient(135deg,#667eea,#764ba2); border-radius:0 0 10px 10px;">
+                <button id="print-btn" onclick="printReceipt()" style="
+                    flex:1; padding:0.65rem; border-radius:8px;
+                    background:rgba(255,255,255,0.15); color:white;
+                    border:1.5px solid rgba(255,255,255,0.35);
+                    font-size:0.85rem; font-weight:600; cursor:pointer;
+                    transition:background 0.15s;
+                ">&#128438; Print</button>
+                <button id="drawer-btn" onclick="openCashDrawer()" style="
+                    flex:1; padding:0.65rem; border-radius:8px;
+                    background:rgba(255,255,255,0.1); color:#fef9c3;
+                    border:1.5px solid rgba(255,255,255,0.25);
+                    font-size:0.85rem; font-weight:600; cursor:pointer;
+                    transition:background 0.15s;
+                ">&#128181; Open Drawer</button>
+            </div>
+
+        </div>
+    </div>
+
+
+        <script>
+        // ── State ────────────────────────────────────────────────────
+        let cart = [];
+        let _lastSaleData = null;
+
+        // ── Init ─────────────────────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('search-input').addEventListener('input', debounce(searchProducts, 300));
+            document.getElementById('category-filter').addEventListener('change', searchProducts);
+            document.getElementById('amount-received').addEventListener('input', calculateChange);
+            document.getElementById('digital-reference').addEventListener('input', updateCheckoutBtn);
+            document.getElementById('digital-amount-paid').addEventListener('input', updateCheckoutBtn);
+            showCash(); // start in cash mode
+        });
+
+        // ── Utilities ────────────────────────────────────────────────
+        function debounce(fn, wait) {
+            let t;
+            return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
+        }
+
+        function getPaymentMethod() {
+            const el = document.querySelector('input[name="payment"]:checked');
+            return el ? el.value : 'cash';
+        }
+
+        // ── Payment tab switching ─────────────────────────────────────
+        function showCash() {
+            document.getElementById('cash-calculator').style.display = 'block';
+            document.getElementById('digital-payment-fields').style.display = 'none';
+            document.querySelector('input[name="payment"][value="cash"]').checked = true;
+            updateCheckoutBtn();
+            calculateChange();
+        }
+
+        function showDigital() {
+            document.getElementById('cash-calculator').style.display = 'none';
+            document.getElementById('digital-payment-fields').style.display = 'block';
+            document.querySelector('input[name="payment"][value="digital"]').checked = true;
+            updateCheckoutBtn();
+        }
+
+        function togglePaymentFields() {
+            if (getPaymentMethod() === 'cash') { showCash(); } else { showDigital(); }
+        }
+
+        // ── Checkout button state ─────────────────────────────────────
+        function updateCheckoutBtn() {
+            const btn = document.getElementById('checkout-btn');
+            if (cart.length === 0) { btn.disabled = true; return; }
+
+            if (getPaymentMethod() === 'digital') {
+                const ref = document.getElementById('digital-reference').value.trim();
+                const amt = parseFloat(document.getElementById('digital-amount-paid').value) || 0;
+                const tot = parseFloat(document.getElementById('total').textContent.replace(/[^0-9.]/g,'')) || 0;
+                btn.disabled = !(ref.length > 0 && amt >= tot);
+            } else {
+                btn.disabled = false;
+            }
+        }
+
+        // ── Change calculation ────────────────────────────────────────
+        function calculateChange() {
+            const total    = parseFloat(document.getElementById('total').textContent.replace(/[^0-9.]/g,'')) || 0;
+            const received = parseFloat(document.getElementById('amount-received').value) || 0;
+            const change   = received - total;
+            document.getElementById('change-amount').textContent = '₱' + (change >= 0 ? change.toFixed(2) : '0.00');
+        }
+
+        // ── Product search ───────────────────────────────────────────
+        async function searchProducts() {
+            const q   = document.getElementById('search-input').value;
+            const cat = document.getElementById('category-filter').value;
+            try {
+                const res  = await fetch(`/api/products/search?q=${encodeURIComponent(q)}&category=${encodeURIComponent(cat)}`);
+                const list = await res.json();
+                renderProducts(list);
+            } catch(e) { console.error('Search failed:', e); }
+        }
+
+        function renderProducts(products) {
+            const grid = document.getElementById('products-grid');
+            if (!products.length) {
+                grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:3rem;color:#888;">No products found</div>';
+                return;
+            }
+            grid.innerHTML = products.map(p => `
+                <div class="product-card" data-id="${p.id}" data-stock="${p.stock}">
+                    <div class="product-image">
+                        ${p.image ? `<img src="/static/images/products/${p.image}" alt="${p.name}">` : '<div class="no-image">No Image</div>'}
+                    </div>
+                    <div class="product-info">
+                        <h3>${p.name}</h3>
+                        <p class="category">${p.category || 'Uncategorized'}</p>
+                        <p class="price">₱${parseFloat(p.price).toFixed(2)}</p>
+                        <p class="stock ${p.stock <= 10 ? 'low' : ''}">Stock: ${p.stock}</p>
+                    </div>
+                    <button class="btn btn-primary add-to-cart" onclick="addToCart(${p.id}, '${p.name.replace(/'/g,"\\'")}', ${p.price}, ${p.stock})">
+                        Add Order
+                    </button>
+                </div>`).join('');
+        }
+
+        // ── Cart operations ──────────────────────────────────────────
+        function addToCart(id, name, price, stock) {
+            const existing = cart.find(i => i.id === id);
+            if (existing) {
+                if (existing.quantity >= stock) { alert('Not enough stock!'); return; }
+                existing.quantity++;
+            } else {
+                cart.push({ id, name, price: parseFloat(price), quantity: 1, stock: parseInt(stock) });
+            }
+            renderCart();
+        }
+
+        function removeFromCart(id) {
+            cart = cart.filter(i => i.id !== id);
+            renderCart();
+        }
+
+        function updateQuantity(id, delta) {
+            const item = cart.find(i => i.id === id);
+            if (!item) return;
+            const newQty = item.quantity + delta;
+            if (newQty <= 0) { removeFromCart(id); return; }
+            if (newQty > item.stock) { alert('Not enough stock!'); return; }
+            item.quantity = newQty;
+            renderCart();
+        }
+
+        function clearCart() {
+            if (!cart.length) return;
+            if (!confirm('Clear all items?')) return;
+            cart = [];
+            renderCart();
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cart-items');
+            if (!cart.length) {
+                container.innerHTML = '<div class="empty-cart"><p>No items added yet</p></div>';
+            } else {
+                container.innerHTML = cart.map(item => `
+                    <div class="cart-item">
+                        <div class="item-info">
+                            <h4>${item.name}</h4>
+                            <p>₱${item.price.toFixed(2)} each</p>
+                        </div>
+                        <div class="item-controls">
+                            <button onclick="updateQuantity(${item.id}, -1)">-</button>
+                            <span>${item.quantity}</span>
+                            <button onclick="updateQuantity(${item.id}, 1)">+</button>
+                        </div>
+                        <div class="item-total">
+                            <p>₱${(item.price * item.quantity).toFixed(2)}</p>
+                            <button class="btn-remove" onclick="removeFromCart(${item.id})">×</button>
+                        </div>
+                    </div>`).join('');
+            }
+            updateTotals();
+        }
+
+        // ── Totals (VAT-inclusive) ────────────────────────────────────
+        function updateTotals() {
+            // PH standard: prices are VAT-inclusive — customer pays the displayed price
+            const total     = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+            const vatAmount = total - (total / 1.12);
+
+            document.getElementById('subtotal').textContent = '₱' + total.toFixed(2);
+            document.getElementById('tax').textContent      = '₱' + vatAmount.toFixed(2);
+            document.getElementById('total').textContent    = '₱' + total.toFixed(2);
+
+            calculateChange();
+            updateCheckoutBtn();
+        }
+
+        // ── Checkout ─────────────────────────────────────────────────
+        async function processCheckout() {
+            if (!cart.length) return;
+
+            const paymentMethod = getPaymentMethod();
+            const total         = parseFloat(document.getElementById('total').textContent.replace(/[^0-9.]/g,'')) || 0;
+            const customerName  = document.getElementById('customer-name').value.trim() || 'Walk-in Customer';
+
+            let requestData = {
+                items: cart.map(i => ({ product_id: i.id, quantity: i.quantity })),
+                payment_method: paymentMethod,
+                customer_name:  customerName
+            };
+
+            if (paymentMethod === 'cash') {
+                const received = parseFloat(document.getElementById('amount-received').value) || 0;
+                if (received < total) { alert('Insufficient amount received!'); return; }
+                requestData.amount_received = received;
+            } else {
+                const ref    = document.getElementById('digital-reference').value.trim();
+                const amtPaid = parseFloat(document.getElementById('digital-amount-paid').value) || 0;
+                if (!ref)           { alert('Please enter the reference number!'); return; }
+                if (amtPaid < total){ alert(`Amount paid ₱${amtPaid.toFixed(2)} is less than total ₱${total.toFixed(2)}!`); return; }
+                requestData.digital_reference   = ref;
+                requestData.digital_amount_paid = amtPaid;
+            }
+
+            const btn = document.getElementById('checkout-btn');
+            btn.disabled    = true;
+            btn.textContent = '⏳ Processing...';
+
+            try {
+                const res    = await fetch('/api/sale/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestData)
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    showReceipt(result, customerName, paymentMethod);
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to create sale'));
+                    btn.disabled    = false;
+                    btn.textContent = '✓ Complete Sale';
+                }
+            } catch(e) {
+                alert('Network error: ' + e.message);
+                btn.disabled    = false;
+                btn.textContent = '✓ Complete Sale';
+            }
+        }
+
+        // ── Receipt ──────────────────────────────────────────────────
+        function showReceipt(saleData, customerName, paymentMethod) {
+            const modal = document.getElementById('receipt-modal');
+            const now   = new Date();
+
+            const dateStr = now.toLocaleDateString('en-PH', { year:'numeric', month:'short', day:'2-digit' });
+            const timeStr = now.toLocaleTimeString('en-PH', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+
+            document.getElementById('receipt-date-left').textContent    = dateStr;
+            document.getElementById('receipt-time-right').textContent   = timeStr;
+            document.getElementById('receipt-txn-id').textContent       = saleData.transaction_id || '—';
+            document.getElementById('receipt-cashier').textContent      = '{{ session.get("username", "Staff") }}';
+            document.getElementById('receipt-customer-name').textContent = customerName || 'Walk-in Customer';
+
+            // VAT-inclusive computation
+            const total      = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+            const vatableAmt = total / 1.12;
+            const vatAmount  = total - vatableAmt;
+
+            document.getElementById('receipt-items-thermal').innerHTML = cart.map(item => {
+                const lineTotal = item.price * item.quantity;
+                return `<div style="margin-bottom:0.4rem;padding-bottom:0.4rem;border-bottom:1px dotted #e0e3ff;">
+                    <div style="display:flex;justify-content:space-between;font-size:0.72rem;font-weight:700;color:#1f2937;">
+                        <span>${item.name}</span>
+                        <span style="color:#667eea;">&#8369;${lineTotal.toFixed(2)}</span>
+                    </div>
+                    <div style="font-size:0.6rem;color:#9ca3af;padding-left:6px;margin-top:1px;">
+                        ${item.quantity} pc${item.quantity > 1 ? 's' : ''} &times; &#8369;${item.price.toFixed(2)}
+                    </div>
+                </div>`;
+            }).join('');
+
+            document.getElementById('r-subtotal').textContent   = '₱' + vatableAmt.toFixed(2);
+            document.getElementById('r-vat').textContent        = '₱' + vatAmount.toFixed(2);
+            document.getElementById('r-total').textContent      = '₱' + parseFloat(saleData.total).toFixed(2);
+            document.getElementById('r-vatable').textContent    = '₱' + vatableAmt.toFixed(2);
+            document.getElementById('r-vat-amount').textContent = '₱' + vatAmount.toFixed(2);
+
+            const isCash = paymentMethod === 'cash';
+            document.getElementById('r-payment-badge').textContent  = isCash ? '💵  CASH PAYMENT' : '📱  DIGITAL PAYMENT';
+            document.getElementById('r-payment-method').textContent = isCash ? 'Cash' : 'Digital / E-Wallet';
+
+            if (isCash) {
+                const received = parseFloat(document.getElementById('amount-received').value) || 0;
+                const change   = Math.max(received - parseFloat(saleData.total), 0);
+                document.getElementById('r-cash-row').style.display   = 'flex';
+                document.getElementById('r-change-row').style.display = 'flex';
+                document.getElementById('r-ref-row').style.display    = 'none';
+                document.getElementById('r-cash-tendered').textContent = '₱' + received.toFixed(2);
+                document.getElementById('r-change').textContent        = '₱' + change.toFixed(2);
+            } else {
+                const ref = document.getElementById('digital-reference').value.trim();
+                document.getElementById('r-cash-row').style.display   = 'none';
+                document.getElementById('r-change-row').style.display = 'none';
+                document.getElementById('r-ref-row').style.display    = 'flex';
+                document.getElementById('r-ref-num').textContent      = ref;
+            }
+
+            document.getElementById('receipt-barcode-text').textContent = saleData.transaction_id || '';
+
+            // Build printer data
+            _lastSaleData = {
+                transaction_id: saleData.transaction_id || '',
+                sale_id:        saleData.sale_id || null,
+                date:           dateStr,
+                time:           timeStr,
+                cashier:        '{{ session.get("username", "Staff") }}',
+                customer:       customerName || 'Walk-in Customer',
+                payment_method: paymentMethod,
+                items: cart.map(i => ({ name: i.name, qty: i.quantity, unit_price: i.price, total: i.price * i.quantity })),
+                vatable:       parseFloat(vatableAmt.toFixed(2)),
+                vat:           parseFloat(vatAmount.toFixed(2)),
+                total:         parseFloat(saleData.total),
+                cash_tendered: isCash ? (parseFloat(document.getElementById('amount-received').value) || 0) : null,
+                change:        isCash ? Math.max((parseFloat(document.getElementById('amount-received').value) || 0) - parseFloat(saleData.total), 0) : null,
+                reference:     !isCash ? document.getElementById('digital-reference').value.trim() : null
+            };
+
+            modal.style.display = 'flex';
+            // Auto-print receipt and open cash drawer on sale completion
+            _thermalPrint(_lastSaleData);
+            openCashDrawer();
+        }
+
+        function closeReceipt() {
+            document.getElementById('receipt-modal').style.display = 'none';
+            cart = [];
+            _lastSaleData = null;
+            renderCart();
+            document.getElementById('amount-received').value      = '';
+            document.getElementById('customer-name').value        = '';
+            document.getElementById('digital-reference').value    = '';
+            document.getElementById('digital-amount-paid').value  = '';
+            document.getElementById('checkout-btn').textContent   = '✓  Complete Sale';
+            showCash(); // reset to cash tab
+        }
+
+        // ── Thermal printer ──────────────────────────────────────────
+        function printReceipt() {
+            if (_lastSaleData) { _thermalPrint(_lastSaleData); } else { window.print(); }
+        }
+
+        async function _thermalPrint(saleData) {
+            const btn = document.getElementById('print-btn');
+            if (btn) { btn.textContent = '⏳ Printing...'; btn.disabled = true; }
+            try {
+                const resp   = await fetch('/api/print-receipt', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(saleData)
+                });
+                const result = await resp.json();
+                if (result.success) {
+                    if (btn) { btn.textContent = '✓ Printed!'; }
+                    setTimeout(() => { if (btn) { btn.textContent = '🖨 Print'; btn.disabled = false; } }, 2000);
+                } else if (result.error === 'no_printer') {
+                    if (btn) { btn.textContent = '🖨 Print'; btn.disabled = false; }
+                } else {
+                    if (btn) { btn.textContent = '🖨 Print'; btn.disabled = false; }
+                }
+            } catch(e) {
+                window.print();
+                if (btn) { btn.textContent = '🖨 Print'; btn.disabled = false; }
+            }
+        }
+
+        async function openCashDrawer() {
+            const btn = document.getElementById('drawer-btn');
+            if (btn) { btn.textContent = '⏳...'; btn.disabled = true; }
+            try {
+                const resp   = await fetch('/api/open-drawer', { method: 'POST' });
+                const result = await resp.json();
+                if (btn) {
+                    btn.textContent = result.success ? '✓ Opened' : '✗ Failed';
+                    setTimeout(() => { btn.textContent = '💵 Open Drawer'; btn.disabled = false; }, 2000);
+                }
+            } catch(e) {
+                if (btn) { btn.textContent = '💵 Open Drawer'; btn.disabled = false; }
+            }
+        }
+
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
+    </script>
+</body>

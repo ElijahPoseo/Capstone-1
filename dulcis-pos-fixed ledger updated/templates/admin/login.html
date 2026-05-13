@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base target="_self">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - StockSecure POS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            min-height: 100vh; 
+            display: flex; 
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            padding: 20px;
+        }
+        
+        .login-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            display: flex;
+            overflow: hidden;
+            width: 100%;
+            max-width: 900px;
+            min-height: 500px;
+        }
+        
+        .left-section {
+            flex: 1;
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .left-section::before {
+            content: '';
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            border: 50px solid rgba(255,255,255,0.03);
+            border-radius: 50%;
+            top: -100px;
+            left: -100px;
+        }
+        
+        .left-section::after {
+            content: '';
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            border: 30px solid rgba(255,255,255,0.02);
+            border-radius: 50%;
+            bottom: -50px;
+            right: -50px;
+        }
+        
+        .illustration-circle {
+            width: 180px;
+            height: 180px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid rgba(255,255,255,0.1);
+            position: relative;
+            z-index: 1;
+        }
+        
+        .shield-icon {
+            width: 80px;
+            height: 90px;
+            background: rgba(229, 62, 62, 0.9);
+            border-radius: 8px 8px 20px 20px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 30px rgba(229, 62, 62, 0.3);
+        }
+        
+        .shield-icon::before {
+            content: '';
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 40px solid transparent;
+            border-right: 40px solid transparent;
+            border-bottom: 25px solid rgba(229, 62, 62, 0.9);
+        }
+        
+        .lock-symbol {
+            width: 28px;
+            height: 22px;
+            background: white;
+            border-radius: 4px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .lock-symbol::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 14px;
+            height: 14px;
+            border: 3px solid white;
+            border-bottom: none;
+            border-radius: 50% 50% 0 0;
+        }
+        
+        .admin-title {
+            position: absolute;
+            bottom: 80px;
+            color: white;
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            z-index: 1;
+        }
+        
+        .admin-subtitle {
+            position: absolute;
+            bottom: 55px;
+            color: rgba(255,255,255,0.5);
+            font-size: 0.8rem;
+            z-index: 1;
+        }
+        
+        .right-section {
+            flex: 1;
+            padding: 3rem 3.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .login-header h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 0.5rem;
+        }
+        
+        .login-header p {
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+        
+        .restricted-badge {
+            display: inline-block;
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1rem;
+        }
+        
+        .alert { 
+            padding: 0.75rem 1rem; 
+            border-radius: 8px; 
+            margin-bottom: 1rem; 
+            font-size: 0.875rem; 
+        }
+        .alert-danger  { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        .alert-warning { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+        
+        .attempt-bar { 
+            background: #fef3c7; 
+            border: 1px solid #fde68a; 
+            border-radius: 8px; 
+            padding: 0.6rem 1rem; 
+            margin-bottom: 1rem; 
+            font-size: 0.82rem; 
+            color: #92400e; 
+            display: flex; 
+            align-items: center; 
+            gap: 0.75rem; 
+        }
+        
+        .attempt-dots { display: flex; gap: 4px; }
+        .adot { width: 10px; height: 10px; border-radius: 50%; background: #d97706; }
+        .adot.empty { background: #e5e7eb; }
+        
+        .form-group { 
+            margin-bottom: 1.25rem; 
+        }
+        
+        .input-field {
+            width: 100%;
+            padding: 0.875rem 1rem 0.875rem 2.75rem;
+            border: none;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            color: #4a5568;
+            background: #e2e8f0;
+            transition: all 0.2s;
+        }
+        
+        .input-field:focus {
+            outline: none;
+            background: #cbd5e0;
+            box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.1);
+        }
+        
+        .input-wrap { 
+            position: relative; 
+        }
+        
+        .input-wrap svg { 
+            position: absolute; 
+            left: 16px; 
+            top: 50%; 
+            transform: translateY(-50%); 
+            color: #718096; 
+            pointer-events: none; 
+            width: 16px;
+            height: 16px;
+        }
+        
+        .captcha-block { 
+            margin-bottom: 1.25rem; 
+            padding: 1rem; 
+            background: #fff5f5; 
+            border: 1.5px solid #fed7d7; 
+            border-radius: 12px; 
+        }
+        
+        .captcha-label { 
+            font-size: 0.75rem; 
+            font-weight: 600; 
+            color: #c53030; 
+            text-transform: uppercase; 
+            letter-spacing: 0.05em; 
+            margin-bottom: 0.75rem; 
+            display: block; 
+        }
+        
+        .captcha-row { 
+            display: flex; 
+            align-items: center; 
+            gap: 0.75rem; 
+            margin-bottom: 0.75rem; 
+        }
+        
+        .captcha-row img { 
+            height: 52px; 
+            width: auto; 
+            border-radius: 6px; 
+            border: 1px solid #fc8181; 
+            display: block; 
+            cursor: pointer;
+        }
+        
+        .btn-refresh { 
+            background: white; 
+            border: 1.5px solid #fc8181; 
+            border-radius: 8px; 
+            padding: 0.5rem 0.875rem; 
+            cursor: pointer; 
+            font-size: 0.8rem; 
+            color: #c53030; 
+            font-weight: 500; 
+            transition: all 0.2s;
+        }
+        
+        .btn-refresh:hover { 
+            background: #fed7d7; 
+        }
+        
+        .captcha-block input { 
+            width: 100%; 
+            padding: 0.75rem 1rem; 
+            border: 1.5px solid #fc8181; 
+            border-radius: 8px; 
+            font-size: 0.9rem; 
+            background: white; 
+        }
+        
+        .captcha-block input:focus { 
+            outline: none; 
+            border-color: #e53e3e; 
+            box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.1); 
+        }
+        
+        .btn-login { 
+            width: 100%; 
+            padding: 0.875rem; 
+            background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%); 
+            color: white; 
+            border: none; 
+            border-radius: 25px; 
+            font-size: 0.9rem; 
+            font-weight: 600; 
+            cursor: pointer; 
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .btn-login:hover { 
+            opacity: 0.9;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(229, 62, 62, 0.4);
+        }
+        
+        .back-link {
+            text-align: center;
+            margin-top: 1.25rem;
+        }
+        
+        .back-link a {
+            color: #718096;
+            font-size: 0.875rem;
+            text-decoration: none;
+        }
+        
+        .back-link a:hover {
+            color: #e53e3e;
+        }
+        
+        .security-note {
+            text-align: center;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #e2e8f0;
+            font-size: 0.7rem;
+            color: #a0aec0;
+        }
+        
+        @media (max-width: 768px) { 
+            .left-section { display: none; } 
+            .login-container { max-width: 400px; }
+            .right-section { padding: 2rem 1.5rem; } 
+        }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <div class="login-container">
+        <div class="left-section">
+            <div class="illustration-circle">
+                <div class="shield-icon">
+                    <div class="lock-symbol"></div>
+                </div>
+            </div>
+            <div class="admin-title">Admin Only</div>
+            <div class="admin-subtitle">Restricted Access Portal</div>
+        </div>
+
+        <div class="right-section">
+            <div class="login-header">
+                <span class="restricted-badge">🔒 Admin Only</span>
+                <h2>Administrator Sign In</h2>
+                <p>System administrators and owners only</p>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% if failed_attempts and failed_attempts > 0 %}
+            <div class="attempt-bar">
+                <div class="attempt-dots">
+                    {% for i in range(5) %}
+                        <div class="adot {% if i >= failed_attempts %}empty{% endif %}"></div>
+                    {% endfor %}
+                </div>
+                {{ failed_attempts }} failed attempt{{ 's' if failed_attempts != 1 else '' }} — locks after 5
+            </div>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('admin_login') }}">
+                <div class="form-group">
+                    <div class="input-wrap">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                        <input type="text" name="username" class="input-field" placeholder="Admin Username" required autofocus autocomplete="username">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <div class="input-wrap">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                        <input type="password" name="password" class="input-field" placeholder="Admin Password" required autocomplete="current-password">
+                    </div>
+                </div>
+
+                {% if show_captcha %}
+                <div class="captcha-block">
+                    <span class="captcha-label">🔐 Security Verification (Math)</span>
+                    <div class="captcha-row">
+                        <img id="captcha-img" src="data:image/png;base64,{{ captcha_img }}" alt="captcha" onclick="refreshCaptcha()">
+                        <button type="button" class="btn-refresh" onclick="refreshCaptcha()">&#8635; New</button>
+                    </div>
+                    <input type="number" name="captcha_answer" id="captcha-answer" placeholder="Enter the answer" required autocomplete="off">
+                    <input type="hidden" name="captcha_token" id="captcha-token" value="{{ captcha_token }}">
+                </div>
+                {% endif %}
+
+                <button type="submit" class="btn-login">Access Admin Panel</button>
+            </form>
+
+            <div class="back-link">
+                <a href="{{ url_for('login') }}">&#8592; Back to Staff Login</a>
+                &nbsp;&nbsp;·&nbsp;&nbsp;
+                <a href="{{ url_for('forgot_password') }}" style="color:#e53e3e;">Forgot Password?</a>
+            </div>
+
+            <div class="security-note">
+                All login attempts are logged and monitored.<br>
+                Unauthorized access attempts will be reported.
+            </div>
+        </div>
+    </div>
+
+    {% if show_captcha %}
+    <script>
+        function refreshCaptcha() {
+            fetch('/captcha/refresh')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('captcha-img').src = 'data:image/png;base64,' + data.image;
+                    document.getElementById('captcha-token').value = data.token;
+                    document.getElementById('captcha-answer').value = '';
+                    document.getElementById('captcha-answer').focus();
+                })
+                .catch(err => {
+                    console.error('CAPTCHA refresh failed:', err);
+                });
+        }
+    </script>
+    {% endif %}
+</body>
+</html>
