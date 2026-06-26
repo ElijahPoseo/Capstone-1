@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base target="_self">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales | Admin Panel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <!-- Timezone conversion script -->
+    <script src="{{ url_for('static', filename='js/timezone.js') }}"></script>
+<base target="_blank">
+</head>
+<body class="admin-body">
+    <div class="admin-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Admin Panel</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-item">📊 Dashboard</a>
+                <a href="{{ url_for('admin_products') }}" class="nav-item">📦 Products</a>
+                <a href="{{ url_for('admin_sales') }}" class="nav-item active">🧾 Sales</a>
+                <a href="{{ url_for('admin_users') }}" class="nav-item">👥 Users</a>
+                <a href="{{ url_for('admin_reports') }}" class="nav-item">📈 Reports</a>
+                <a href="{{ url_for('admin_audit_log') }}" class="nav-item">🔍 Audit Log</a>
+                <a href="{{ url_for('admin_ledger') }}" class="nav-item">🔐 Ledger</a>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="{{ url_for('pos') }}" class="nav-item">🛒 Back to POS</a>
+                <a href="{{ url_for('logout') }}" class="nav-item">🚪 Logout</a>
+            </div>
+        </aside>
+
+        <main class="admin-main">
+            <header class="admin-header">
+                <h1>Sales History</h1>
+                <span id="local-clock" style="color: #667eea; font-weight: 600;"></span>
+            </header>
+            
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Sales History</span>
+            </div>
+            
+            <div class="card">
+                <form method="GET" class="form-row" style="margin-bottom: 1.5rem;">
+                    <div class="form-group">
+                        <label>From Date</label>
+                        <input type="date" name="from" value="{{ date_from }}">
+                    </div>
+                    <div class="form-group">
+                        <label>To Date</label>
+                        <input type="date" name="to" value="{{ date_to }}">
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: flex-end;">
+                        <button type="submit" class="btn btn-primary">Filter</button>
+                    </div>
+                </form>
+
+                <div class="stats-grid" style="margin-bottom: 1.5rem;">
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Total Revenue</span>
+                            <span class="stat-value">₱{{ "%.2f"|format(total_revenue) }}</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-label">Transactions</span>
+                            <span class="stat-value">{{ sales|length }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Transaction ID</th>
+                                <th>Date & Time (Local)</th>
+                                <th>Customer</th>
+                                <th>Cashier</th>
+                                <th>Items</th>
+                                <th>Payment</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sale in sales %}
+                            <tr>
+                                <td><code>{{ sale.transaction_id }}</code></td>
+                                <!-- TIMEZONE FIX: Use data-utc attribute for local conversion -->
+                                <td data-utc="{{ sale.created_at }}">{{ sale.created_at }}</td>
+                                <td>{{ sale.customer_name or 'Walk-in Customer' }}</td>
+                                <td>{{ sale.cashier_name }}</td>
+                                <td>{{ sale.item_count }}</td>
+                                <td>{{ sale.payment_method.title() }}</td>
+                                <td>₱{{ "%.2f"|format(sale.total_amount) }}</td>
+                                <td>
+                                    <span class="badge badge-success">{{ sale.payment_status.title() }}</span>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted">No sales found for selected period</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
