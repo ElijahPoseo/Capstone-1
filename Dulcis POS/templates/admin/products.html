@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base target="_self">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Products | Admin Panel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <style>
+        .badge-ok { background: #d1fae5; color: #065f46; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-critical { background: #fed7aa; color: #9a3412; }
+        .badge-expired { background: #dc2626; color: #fff; }
+        .expiry-banner { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 14px 18px; margin-bottom: 18px; }
+        .expiry-banner.has-expired { background: #fee2e2; border-color: #ef4444; }
+        .expiry-banner h3 { margin: 0 0 10px 0; font-size: 15px; color: #92400e; }
+        .expiry-banner.has-expired h3 { color: #991b1b; }
+        .expiry-list { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+        .expiry-list li { background: #fff; border: 1px solid #fcd34d; border-radius: 6px; padding: 4px 10px; font-size: 13px; }
+        .expiry-list li.expired { border-color: #fca5a5; }
+        .expiry-list li.critical { border-color: #fdba74; }
+        .days-badge { border-radius: 10px; padding: 1px 7px; font-size: 11px; font-weight: 700; }
+        .days-badge.expired { color: #dc2626; }
+        .days-badge.critical { color: #c2410c; }
+        .days-badge.warning { color: #b45309; }
+        .expiry-status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <div class="admin-container">
+        <aside class="sidebar">
+            <div class="sidebar-header"><h2>Admin Panel</h2></div>
+            <nav class="sidebar-nav">
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-item">📊 Dashboard</a>
+                <a href="{{ url_for('admin_products') }}" class="nav-item active">📦 Products</a>
+                <a href="{{ url_for('admin_sales') }}" class="nav-item">🧾 Sales</a>
+                <a href="{{ url_for('admin_users') }}" class="nav-item">👥 Users</a>
+                <a href="{{ url_for('admin_reports') }}" class="nav-item">📈 Reports</a>
+                <a href="{{ url_for('admin_audit_log') }}" class="nav-item">🔍 Audit Log</a>
+                <a href="{{ url_for('admin_ledger') }}" class="nav-item">🔐 Ledger</a>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="{{ url_for('pos') }}" class="nav-item">🛒 Back to POS</a>
+                <a href="{{ url_for('logout') }}" class="nav-item">🚪 Logout</a>
+            </div>
+        </aside>
+
+        <main class="admin-main">
+            <header class="admin-header">
+                <h1>Product Management</h1>
+                <button class="btn btn-primary" onclick="openAddModal()">+ Add Product</button>
+            </header>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <div id="expiry-banner" style="display:none;"></div>
+
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Image</th>
+                                <th>Name</th>
+                                <th>Category</th>
+                                <th>Price</th>
+                                <th>Stock</th>
+                                <th>Expiry</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for product in products %}
+                        <tr>
+                            <td>
+                                {% if product.image %}
+                                <img src="{{ url_for('static', filename='images/products/' + product.image) }}" alt="" class="thumbnail">
+                                {% else %}
+                                <div class="no-thumbnail">No Image</div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <strong>{{ product.name }}</strong>
+                                {% if product.barcode %}<br><small class="text-muted">{{ product.barcode }}</small>{% endif %}
+                            </td>
+                            <td>{{ product.category_name or 'Uncategorized' }}</td>
+                            <td>₱{{ "%.2f"|format(product.price) }}</td>
+                            <td>
+                                <span class="{% if product.stock <= product.min_stock_level %}text-danger{% endif %}">
+                                    {{ product.stock }}
+                                </span>
+                                <small class="text-muted">/ min: {{ product.min_stock_level }}</small>
+                            </td>
+                            <td>
+                                {% if product.expiration_date %}
+                                    <span class="expiry-date" data-date="{{ product.expiration_date }}" data-warn="{{ product.expiry_warning_days or 30 }}">
+                                        {{ product.expiration_date }}
+                                    </span><br>
+                                    <span class="expiry-status-badge" data-date="{{ product.expiration_date }}" data-warn="{{ product.expiry_warning_days or 30 }}"></span>
+                                {% else %}
+                                    <small class="text-muted">—</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge {% if product.is_active %}badge-success{% else %}badge-danger{% endif %}">
+                                    {{ 'Active' if product.is_active else 'Inactive' }}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-secondary" onclick="editProduct({{ product.id }})">Edit</button>
+
+                                {% if product.is_active %}
+                                <form action="{{ url_for('delete_product', product_id=product.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Delete this product? It will be hidden from POS but its sales history is kept, and you can reactivate it later.')">
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                </form>
+                                {% else %}
+                                <form action="{{ url_for('reactivate_product', product_id=product.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Reactivate this product? It will appear in POS and admin listings again.')">
+                                    <button type="submit" class="btn btn-sm btn-success">Reactivate</button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal" id="add-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add New Product</h2>
+                <button class="btn-close" onclick="closeModal('add-modal')">&times;</button>
+            </div>
+            <form action="{{ url_for('add_product') }}" method="POST" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label>Product Name *</label>
+                    <input type="text" name="name" required minlength="2">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea name="description" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Price (₱) *</label>
+                        <input type="number" name="price" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Stock *</label>
+                        <input type="number" name="stock" min="0" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select name="category_id">
+                            <option value="">Select Category</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Min Stock Level</label>
+                        <input type="number" name="min_stock_level" value="10" min="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Barcode</label>
+                    <input type="text" name="barcode">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Expiration Date</label>
+                        <input type="date" name="expiration_date">
+                    </div>
+                    <div class="form-group">
+                        <label>Expiry Warning (days before)</label>
+                        <input type="number" name="expiry_warning_days" value="30" min="1" max="365">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Product Image</label>
+                    <input type="file" name="image" accept="image/*">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('add-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Product</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="edit-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Product</h2>
+                <button class="btn-close" onclick="closeModal('edit-modal')">&times;</button>
+            </div>
+            <form id="edit-form" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="id" id="edit-id">
+                <div class="form-group">
+                    <label>Product Name *</label>
+                    <input type="text" name="name" id="edit-name" required minlength="2">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea name="description" id="edit-description" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Price (₱) *</label>
+                        <input type="number" name="price" id="edit-price" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Stock *</label>
+                        <input type="number" name="stock" id="edit-stock" min="0" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select name="category_id" id="edit-category">
+                            <option value="">Select Category</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Min Stock Level</label>
+                        <input type="number" name="min_stock_level" id="edit-min-stock" min="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Barcode</label>
+                    <input type="text" name="barcode" id="edit-barcode">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Expiration Date</label>
+                        <input type="date" name="expiration_date" id="edit-expiration-date">
+                    </div>
+                    <div class="form-group">
+                        <label>Expiry Warning (days before)</label>
+                        <input type="number" name="expiry_warning_days" id="edit-expiry-warning-days" value="30" min="1" max="365">
+                    </div>
+                </div>
+                <div id="edit-expiry-preview" style="margin-top:-8px; margin-bottom:8px; font-size:13px; color:#6b7280;"></div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" name="is_active" id="edit-active" checked>
+                        Active
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>Product Image</label>
+                    <input type="file" name="image" accept="image/*">
+                    <small class="text-muted">Leave empty to keep current image</small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('edit-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openAddModal() {
+            document.getElementById('add-modal').style.display = 'flex';
+        }
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        // ── Expiry helpers ──────────────────────────────────────────
+        function expiryStatus(dateStr, warnDays) {
+            const today = new Date(); today.setHours(0,0,0,0);
+            const exp = new Date(dateStr + 'T00:00:00');
+            const days = Math.round((exp - today) / 86400000);
+            let status = 'ok', label = `${days}d left`;
+            if (days < 0) { status = 'expired'; label = `Expired ${Math.abs(days)}d ago`; }
+            else if (days === 0) { status = 'critical'; label = 'TODAY'; }
+            else if (days <= 7) { status = 'critical'; label = `${days}d left`; }
+            else if (days <= warnDays) { status = 'warning'; label = `${days}d left`; }
+            return { status, label, days };
+        }
+
+        function renderExpiryBadges() {
+            document.querySelectorAll('.expiry-status-badge').forEach(el => {
+                const date = el.dataset.date;
+                const warn = parseInt(el.dataset.warn) || 30;
+                const info = expiryStatus(date, warn);
+                const cls = info.status === 'ok' ? 'badge-ok' : (info.status === 'expired' ? 'badge-expired' : (info.status === 'critical' ? 'badge-critical' : 'badge-warning'));
+                el.className = 'expiry-status-badge ' + cls;
+                el.textContent = info.label;
+            });
+        }
+
+        async function renderExpiryBanner() {
+            try {
+                const res = await fetch('/api/products/expiring');
+                const items = await res.json();
+                const hasExpired = items.some(i => i.status === 'expired');
+                const banner = document.getElementById('expiry-banner');
+                if (!items.length) { banner.style.display = 'none'; return; }
+                banner.className = 'expiry-banner' + (hasExpired ? ' has-expired' : '');
+                let html = `<h3>${hasExpired ? 'Expired & Expiring Soon' : 'Products Expiring Soon'} (${items.length})</h3><ul class="expiry-list">`;
+                items.forEach(item => {
+                    const days = Math.round(item.days_until_expiry);
+                    const cls = item.status;
+                    const dayLabel = days < 0 ? `expired ${Math.abs(days)}d ago` : (days === 0 ? 'TODAY' : `in ${days}d`);
+                    html += `<li class="${cls}"><strong>${item.name}</strong> — <span class="days-badge ${cls}">${dayLabel}</span> (${item.expiration_date}) · Stock: ${item.stock}</li>`;
+                });
+                html += '</ul>';
+                banner.innerHTML = html;
+                banner.style.display = 'block';
+            } catch (e) { /* silently skip if unavailable */ }
+        }
+
+        function updateExpiryPreview(date, warnDays) {
+            const preview = document.getElementById('edit-expiry-preview');
+            if (!preview) return;
+            if (!date) { preview.textContent = ''; return; }
+            const info = expiryStatus(date, warnDays);
+            preview.textContent = info.status === 'expired' ? `Already expired (${info.label})` : `Expires in ${info.days} day(s)`;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderExpiryBadges();
+            renderExpiryBanner();
+        });
+
+        async function editProduct(id) {
+            try {
+                const response = await fetch(`/api/product/${id}`);
+                const product = await response.json();
+                
+                document.getElementById('edit-id').value = product.id;
+                document.getElementById('edit-name').value = product.name;
+                document.getElementById('edit-description').value = product.description || '';
+                document.getElementById('edit-price').value = product.price;
+                document.getElementById('edit-stock').value = product.stock;
+                document.getElementById('edit-category').value = product.category_id || '';
+                document.getElementById('edit-min-stock').value = product.min_stock_level;
+                document.getElementById('edit-barcode').value = product.barcode || '';
+                document.getElementById('edit-active').checked = product.is_active;
+                document.getElementById('edit-expiration-date').value = product.expiration_date || '';
+                document.getElementById('edit-expiry-warning-days').value = product.expiry_warning_days || 30;
+                updateExpiryPreview(product.expiration_date, product.expiry_warning_days || 30);
+                
+                document.getElementById('edit-form').action = `/admin/product/edit/${id}`;
+                document.getElementById('edit-modal').style.display = 'flex';
+            } catch (error) {
+                alert('Failed to load product data');
+            }
+        }
+        document.getElementById('edit-expiration-date').addEventListener('change', function() {
+            const warn = parseInt(document.getElementById('edit-expiry-warning-days').value) || 30;
+            updateExpiryPreview(this.value, warn);
+        });
+        document.getElementById('edit-expiry-warning-days').addEventListener('change', function() {
+            const date = document.getElementById('edit-expiration-date').value;
+            updateExpiryPreview(date, parseInt(this.value) || 30);
+        });
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>
