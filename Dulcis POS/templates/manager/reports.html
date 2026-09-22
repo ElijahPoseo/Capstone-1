@@ -41,6 +41,7 @@
         </div>
         <nav class="sidebar-nav">
             <a href="{{ url_for('manager_dashboard') }}" class="nav-item">📊 Dashboard</a>
+            <a href="{{ url_for('manager_products') }}" class="nav-item">📦 Products</a>
             <a href="{{ url_for('manager_sales') }}" class="nav-item">🧾 Sales</a>
             <a href="{{ url_for('manager_reports') }}" class="nav-item active">📈 Reports</a>
             <a href="{{ url_for('manager_cancel_orders') }}" class="nav-item">❌ Cancel Orders</a>
@@ -93,6 +94,54 @@
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">Monthly Sales (Last 12 Months)</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Transactions</th>
+                                <th>Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in monthly_sales %}
+                            <tr>
+                                <td>{{ row.month }}</td>
+                                <td>{{ row.transactions }}</td>
+                                <td>₱{{ "%.2f"|format(row.revenue) }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="3" style="text-align:center;padding:2rem;color:#9ca3af;">No data available.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card">
+                    <div class="card-header">Annual Sales</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Year</th>
+                                <th>Transactions</th>
+                                <th>Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in annual_sales %}
+                            <tr>
+                                <td>{{ row.year }}</td>
+                                <td>{{ row.transactions }}</td>
+                                <td>₱{{ "%.2f"|format(row.revenue) }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="3" style="text-align:center;padding:2rem;color:#9ca3af;">No data available.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>

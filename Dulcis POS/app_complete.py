@@ -1403,6 +1403,28 @@ def _build_sales_csv(date_from, date_to):
         headers={'Content-Disposition': f'attachment; filename="{filename}"'}
     )
 
+@app.route("/manager/products")
+@login_required
+@manager_required
+def manager_products():
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT p.*, c.name as category_name
+            FROM products p
+            LEFT JOIN categories c ON p.category_id = c.id
+            ORDER BY p.created_at DESC
+        """).fetchall()
+
+        categories = conn.execute("SELECT * FROM categories ORDER BY name").fetchall()
+
+    products = []
+    for r in rows:
+        d = dict(r)
+        d['barcode'] = decrypt(d['barcode'])
+        products.append(d)
+
+    return render_template("manager/products.html", products=products, categories=categories)
+
 @app.route("/manager/sales")
 @login_required
 @manager_required
@@ -1458,6 +1480,26 @@ def manager_reports():
                         'revenue': float(r['revenue']) if r['revenue'] else 0}
                        for r in daily_sales_raw]
 
+        monthly_sales_raw = conn.execute("""
+            SELECT strftime('%Y-%m', created_at) as month, COUNT(*) as transactions, SUM(total_amount) as revenue
+            FROM sales
+            WHERE created_at >= date('now', '-12 months') AND is_cancelled = 0
+            GROUP BY month ORDER BY month DESC
+        """).fetchall()
+        monthly_sales = [{'month': r['month'], 'transactions': r['transactions'],
+                          'revenue': float(r['revenue']) if r['revenue'] else 0}
+                         for r in monthly_sales_raw]
+
+        annual_sales_raw = conn.execute("""
+            SELECT strftime('%Y', created_at) as year, COUNT(*) as transactions, SUM(total_amount) as revenue
+            FROM sales
+            WHERE is_cancelled = 0
+            GROUP BY year ORDER BY year DESC
+        """).fetchall()
+        annual_sales = [{'year': r['year'], 'transactions': r['transactions'],
+                         'revenue': float(r['revenue']) if r['revenue'] else 0}
+                        for r in annual_sales_raw]
+
         top_products_raw = conn.execute("""
             SELECT p.name, SUM(si.quantity) as total_sold, SUM(si.total_price) as revenue
             FROM sale_items si
@@ -1484,6 +1526,7 @@ def manager_reports():
                           for r in category_sales_raw]
 
     return render_template("manager/reports.html", daily_sales=daily_sales,
+                           monthly_sales=monthly_sales, annual_sales=annual_sales,
                            top_products=top_products, category_sales=category_sales)
 
 @app.route("/manager/cancel-orders")
@@ -1597,8 +1640,10 @@ def admin_products():
 
 @app.route("/admin/product/add", methods=["POST"])
 @login_required
-@admin_required
+@role_required('admin', 'manager')
 def add_product():
+    redirect_target = 'admin_products' if session.get('role') == 'admin' else 'manager_products'
+
     name = request.form.get('name', '').strip()
     description = request.form.get('description', '').strip()
     price = request.form.get('price', 0)
@@ -1611,7 +1656,7 @@ def add_product():
 
     if not name or len(name) < 2:
         flash("Product name must be at least 2 characters.", "danger")
-        return redirect(url_for('admin_products'))
+        return redirect(url_for(redirect_target))
 
     try:
         price = float(price)
@@ -1619,7 +1664,7 @@ def add_product():
             raise ValueError("Price cannot be negative")
     except ValueError:
         flash("Invalid price.", "danger")
-        return redirect(url_for('admin_products'))
+        return redirect(url_for(redirect_target))
 
     try:
         stock = int(stock)
@@ -1627,7 +1672,7 @@ def add_product():
             raise ValueError("Stock cannot be negative")
     except ValueError:
         flash("Invalid stock quantity.", "danger")
-        return redirect(url_for('admin_products'))
+        return redirect(url_for(redirect_target))
 
     image_filename = None
     if 'image' in request.files:
@@ -1670,7 +1715,7 @@ def add_product():
             'name': name, 'price': price, 'stock': stock
         })
 
-    return redirect(url_for('admin_products'))
+    return redirect(url_for(redirect_target))
 
 @app.route("/admin/product/edit/<int:product_id>", methods=["POST"])
 @login_required
@@ -1752,6 +1797,52 @@ def edit_product(product_id):
     })
 
     return redirect(url_for('admin_products'))
+
+@app.route("/product/restock/<int:product_id>", methods=["POST"])
+@login_required
+@manager_required
+def restock_product(product_id):
+    redirect_target = 'admin_products' if session.get('role') == 'admin' else 'manager_products'
+
+    qty = request.form.get('quantity', '').strip()
+    try:
+        qty = int(qty)
+        if qty <= 0:
+            raise ValueError("Quantity must be positive")
+    except ValueError:
+        flash("Enter a valid quantity to add (whole number greater than 0).", "danger")
+        return redirect(url_for(redirect_target))
+
+    with get_db() as conn:
+        product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
+        if not product:
+            flash("Product not found.", "danger")
+            return redirect(url_for(redirect_target))
+
+        old_stock = product['stock']
+        new_stock = old_stock + qty
+
+        conn.execute("""
+            UPDATE products SET stock = stock + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+        """, (qty, product_id))
+        conn.commit()
+
+        product_name = product['name']
+        flash(f"Restocked {product_name}: +{qty} units ({old_stock} → {new_stock}).", "success")
+
+    ledger.log("STOCK_IN", session['user_id'], {
+        'product_id': product_id,
+        'product_name': product_name,
+        'qty_in': qty,
+        'previous_stock': old_stock,
+        'new_stock': new_stock,
+        'reason': 'Restock',
+        'by': session.get('username')
+    })
+    log_audit("PRODUCT_RESTOCKED", "products", product_id,
+              {'stock': old_stock}, {'stock': new_stock, 'qty_added': qty})
+
+    return redirect(url_for(redirect_target))
 
 @app.route("/admin/product/delete/<int:product_id>", methods=["POST"])
 @login_required
@@ -1991,6 +2082,41 @@ def admin_reports():
             for row in daily_sales_raw
         ]
 
+        monthly_sales_raw = conn.execute("""
+            SELECT strftime('%Y-%m', created_at) as month, COUNT(*) as transactions, SUM(total_amount) as revenue
+            FROM sales
+            WHERE created_at >= date('now', '-12 months')
+            AND is_cancelled = 0
+            GROUP BY month
+            ORDER BY month DESC
+        """).fetchall()
+
+        monthly_sales = [
+            {
+                'month': row['month'],
+                'transactions': row['transactions'],
+                'revenue': float(row['revenue']) if row['revenue'] else 0
+            }
+            for row in monthly_sales_raw
+        ]
+
+        annual_sales_raw = conn.execute("""
+            SELECT strftime('%Y', created_at) as year, COUNT(*) as transactions, SUM(total_amount) as revenue
+            FROM sales
+            WHERE is_cancelled = 0
+            GROUP BY year
+            ORDER BY year DESC
+        """).fetchall()
+
+        annual_sales = [
+            {
+                'year': row['year'],
+                'transactions': row['transactions'],
+                'revenue': float(row['revenue']) if row['revenue'] else 0
+            }
+            for row in annual_sales_raw
+        ]
+
         top_products_raw = conn.execute("""
             SELECT p.name, SUM(si.quantity) as total_sold, SUM(si.total_price) as revenue
             FROM sale_items si
@@ -2033,7 +2159,8 @@ def admin_reports():
             for row in category_sales_raw
         ]
 
-    return render_template("admin/reports.html", daily_sales=daily_sales, 
+    return render_template("admin/reports.html", daily_sales=daily_sales,
+                          monthly_sales=monthly_sales, annual_sales=annual_sales,
                           top_products=top_products, category_sales=category_sales)
 
 @app.route("/admin/audit-log")
@@ -2944,8 +3071,8 @@ def _escpos_receipt(sale_data, cfg):
     buf += DOUBLE_BOTH
     buf += enc("DULCIS & CAFE") + LF
     buf += NORMAL
-    buf += enc("Guzman street Mandurriao, Iloilo City ") + LF
-    buf += enc("VAT Reg. TIN: 000-000-000-00000") + LF
+    buf += enc("Guzman street, Brgy. Jesena Mandurriao, Iloilo City ") + LF
+    buf += enc("VAT Reg. TIN: 300-742-799-00000") + LF
     buf += divider('=')
     buf += ALIGN_LEFT
     buf += enc(f"Date   : {sale_data.get('date','')}") + LF

@@ -52,6 +52,12 @@
                 <button class="btn btn-primary" onclick="openAddModal()">+ Add Product</button>
             </header>
 
+            <div class="card" style="padding: 12px 18px; margin-bottom: 18px;">
+                <input type="text" id="product-search" placeholder="🔍 Search products by name, barcode, or category..."
+                       style="width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9rem;"
+                       oninput="filterProducts()">
+            </div>
+
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     <div class="flash-messages">
@@ -81,7 +87,8 @@
                         </thead>
                         <tbody>
                         {% for product in products %}
-                        <tr>
+                        <tr class="product-row"
+                            data-search="{{ (product.name ~ ' ' ~ (product.barcode or '') ~ ' ' ~ (product.category_name or ''))|lower }}">
                             <td>
                                 {% if product.image %}
                                 <img src="{{ url_for('static', filename='images/products/' + product.image) }}" alt="" class="thumbnail">
@@ -117,6 +124,7 @@
                                 </span>
                             </td>
                             <td>
+                                <button class="btn btn-sm btn-primary" onclick="openRestockModal({{ product.id }}, '{{ product.name|e }}', {{ product.stock }})">Restock</button>
                                 <button class="btn btn-sm btn-secondary" onclick="editProduct({{ product.id }})">Edit</button>
 
                                 {% if product.is_active %}
@@ -131,11 +139,38 @@
                             </td>
                         </tr>
                         {% endfor %}
+                        <tr id="no-results-row" style="display:none;">
+                            <td colspan="8" style="text-align:center; color:#9ca3af; padding: 1.5rem;">No products match your search.</td>
+                        </tr>
                     </tbody>
                     </table>
                 </div>
             </div>
         </main>
+    </div>
+
+    <div class="modal" id="restock-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Restock Product</h2>
+                <button class="btn-close" onclick="closeModal('restock-modal')">&times;</button>
+            </div>
+            <form id="restock-form" method="POST">
+                <div class="form-group">
+                    <label id="restock-product-label">Product</label>
+                    <div id="restock-current-stock" style="font-size: 0.85rem; color: #6b7280; margin-top: -0.35rem; margin-bottom: 0.75rem;"></div>
+                </div>
+                <div class="form-group">
+                    <label>Quantity to Add *</label>
+                    <input type="number" name="quantity" id="restock-quantity" min="1" step="1" required autofocus>
+                </div>
+                <div id="restock-preview" style="font-size: 0.85rem; color: #6b7280; margin-top: -0.5rem;"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('restock-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Confirm Restock</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <div class="modal" id="add-modal">
@@ -286,6 +321,41 @@
         function closeModal(modalId) {
             document.getElementById(modalId).style.display = 'none';
         }
+
+        // ── Search / filter ─────────────────────────────────────────
+        function filterProducts() {
+            const query = document.getElementById('product-search').value.trim().toLowerCase();
+            const rows = document.querySelectorAll('.product-row');
+            let visibleCount = 0;
+            rows.forEach(row => {
+                const match = row.dataset.search.includes(query);
+                row.style.display = match ? '' : 'none';
+                if (match) visibleCount++;
+            });
+            const noResultsRow = document.getElementById('no-results-row');
+            if (noResultsRow) {
+                noResultsRow.style.display = (visibleCount === 0 && query !== '') ? '' : 'none';
+            }
+        }
+
+        // ── Restock ──────────────────────────────────────────────────
+        let restockCurrentStock = 0;
+        function openRestockModal(id, name, currentStock) {
+            restockCurrentStock = currentStock;
+            document.getElementById('restock-product-label').textContent = `Product: ${name}`;
+            document.getElementById('restock-current-stock').textContent = `Current stock: ${currentStock}`;
+            document.getElementById('restock-quantity').value = '';
+            document.getElementById('restock-preview').textContent = '';
+            document.getElementById('restock-form').action = `/product/restock/${id}`;
+            document.getElementById('restock-modal').style.display = 'flex';
+            document.getElementById('restock-quantity').focus();
+        }
+        document.getElementById('restock-quantity').addEventListener('input', function() {
+            const qty = parseInt(this.value);
+            const preview = document.getElementById('restock-preview');
+            if (!qty || qty <= 0) { preview.textContent = ''; return; }
+            preview.textContent = `New stock will be: ${restockCurrentStock + qty}`;
+        });
 
         // ── Expiry helpers ──────────────────────────────────────────
         function expiryStatus(dateStr, warnDays) {

@@ -6,7 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reports | Admin Panel</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+
 <base target="_blank">
 </head>
 <body class="admin-body">
@@ -70,6 +71,60 @@
                     </table>
                 </div>
             </div>
+            <div class="content-grid">
+                <div class="card">
+                    <h3>Monthly Sales (Last 12 Months)</h3>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Month</th>
+                                    <th>Transactions</th>
+                                    <th>Revenue</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in monthly_sales %}
+                                <tr>
+                                    <td>{{ row.month }}</td>
+                                    <td>{{ row.transactions }}</td>
+                                    <td>₱{{ "%.2f"|format(row.revenue) }}</td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="3" class="text-center text-muted">No monthly data yet</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Annual Sales</h3>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Year</th>
+                                    <th>Transactions</th>
+                                    <th>Revenue</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in annual_sales %}
+                                <tr>
+                                    <td>{{ row.year }}</td>
+                                    <td>{{ row.transactions }}</td>
+                                    <td>₱{{ "%.2f"|format(row.revenue) }}</td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="3" class="text-center text-muted">No annual data yet</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 
